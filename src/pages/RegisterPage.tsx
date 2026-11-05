@@ -48,7 +48,7 @@ import { FestiveBadge } from '../components/ui/FestiveBadge.tsx';
  * it as a new row in your connected Google Sheet.
  */
 export const GOOGLE_SCRIPT_WEB_APP_URL =
-  'https://script.google.com/macros/s/AKfycb5jcjA7eOfQftjnuJ62Hg1yB0BYPXd1vS0awOgvK2-_2aE7P0gSoWHICw8xaqBgf8aA/exec';
+  'https://script.google.com/macros/s/AKfycbx5sIBLF1mvrFmWp9jDueYdWgqUUITGMMZOrbrAIxRes0NymQGdfmicH0lTc7YJRl5njQ/exec';
 
 export const REGISTRATION_FEE_INR = 400;
 
@@ -575,8 +575,20 @@ export const RegisterPage: React.FC = () => {
       setIsSuccess(true);
       window.scrollTo({ top: 60, behavior: 'smooth' });
     } catch (err) {
-      console.error('Submission error:', err);
-      // Fallback: Proceed to success state since payload is cached locally
+      console.error('Submission error (showing printable view):', err);
+      // Fallback: Proceed to success state since payload is cached locally and user can print slip
+      try {
+        const stored = JSON.parse(
+          localStorage.getItem('festive_hackathon_registrations') || '[]'
+        );
+        stored.push(payload);
+        localStorage.setItem(
+          'festive_hackathon_registrations',
+          JSON.stringify(stored)
+        );
+      } catch (storageErr) {
+        console.warn('Local storage write notice:', storageErr);
+      }
       setIsSubmitting(false);
       setIsSuccess(true);
       window.scrollTo({ top: 60, behavior: 'smooth' });
@@ -611,8 +623,96 @@ export const RegisterPage: React.FC = () => {
 
   return (
     <div className="relative min-h-screen bg-[#041710] text-[#FFF4DF] overflow-x-hidden selection:bg-[#E9C578] selection:text-[#09271E] pb-24 font-body">
+      {/* Embedded Print CSS for Clean Slip Isolation */}
+      <style>{`
+        @media print {
+          /* 1. Strict Isolation: Hide headers, navbars, background ambience, footers & action buttons */
+          header, nav, button, .no-print {
+            display: none !important;
+          }
+
+          /* 2. Reset html & body to crisp white with dark high-contrast typography */
+          html, body, #root {
+            background: #ffffff !important;
+            color: #111827 !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+
+          @page {
+            size: auto;
+            margin: 1.2cm;
+          }
+
+          /* Neutralize background glows and outer containers */
+          div, main {
+            box-shadow: none !important;
+            border-color: transparent !important;
+            background: transparent !important;
+          }
+
+          /* 3. Isolate ONLY the registration slip container on a crisp white card */
+          .registration-print-slip {
+            display: block !important;
+            position: relative !important;
+            background: #ffffff !important;
+            color: #111827 !important;
+            border: 2px solid #09271E !important;
+            border-radius: 12px !important;
+            padding: 24px 28px !important;
+            margin: 0 auto !important;
+            width: 100% !important;
+            max-width: 720px !important;
+            box-shadow: none !important;
+            page-break-inside: avoid !important;
+          }
+
+          .registration-print-slip * {
+            color: #111827 !important;
+            text-shadow: none !important;
+          }
+
+          .registration-print-slip .print-brand-title {
+            color: #09271E !important;
+            font-weight: 800 !important;
+          }
+
+          .registration-print-slip .print-badge {
+            background: #F3F4F6 !important;
+            border: 1px solid #111827 !important;
+            color: #111827 !important;
+            font-weight: 600 !important;
+          }
+
+          .registration-print-slip .print-border-b {
+            border-bottom: 1px solid #E5E7EB !important;
+          }
+
+          .registration-print-slip .print-border {
+            border-color: #E5E7EB !important;
+          }
+
+          .registration-print-slip .print-text-gold {
+            color: #855800 !important;
+            font-weight: 700 !important;
+          }
+
+          .registration-print-slip .print-text-emerald {
+            color: #065F46 !important;
+            font-weight: 700 !important;
+          }
+
+          .registration-print-slip .print-bg-subtle {
+            background: #F9FAFB !important;
+            border: 1px solid #E5E7EB !important;
+          }
+        }
+      `}</style>
+
       {/* Background Decorative Ambience */}
-      <div className="fixed inset-0 pointer-events-none z-0">
+      <div className="no-print fixed inset-0 pointer-events-none z-0">
         <div className="absolute -top-40 -left-40 h-[500px] w-[500px] rounded-full bg-[#123D2B]/35 blur-[120px]" />
         <div className="absolute top-1/3 -right-40 h-[600px] w-[600px] rounded-full bg-[#0E3526]/40 blur-[140px]" />
         <div className="absolute -bottom-40 left-1/3 h-[500px] w-[500px] rounded-full bg-[#E9C578]/5 blur-[130px]" />
@@ -620,7 +720,7 @@ export const RegisterPage: React.FC = () => {
       </div>
 
       {/* Top Festive Header Bar */}
-      <header className="sticky top-0 z-40 border-b border-[#E9C578]/20 bg-[#061C14]/90 backdrop-blur-xl transition-all">
+      <header className="no-print sticky top-0 z-40 border-b border-[#E9C578]/20 bg-[#061C14]/90 backdrop-blur-xl transition-all">
         <FestiveContainer size="xl">
           <div className="flex h-16 sm:h-20 items-center justify-between gap-4">
             <Link
@@ -658,7 +758,7 @@ export const RegisterPage: React.FC = () => {
       <main className="relative z-10 pt-8 sm:pt-12">
         <FestiveContainer size="md">
           {/* Header Title & Intro */}
-          <div className="text-center mb-8 sm:mb-10">
+          <div className="no-print text-center mb-8 sm:mb-10">
             <div className="inline-flex items-center gap-2 rounded-full border border-[#E9C578]/30 bg-[#0A261D]/80 px-4 py-1.5 text-xs font-mono font-medium text-[#E9C578] backdrop-blur-md shadow-sm mb-4">
               <Sparkles className="h-3.5 w-3.5 text-[#FFD700] animate-pulse" />
               <span>Christmas Edition 2026 • 8-Hour Sprint</span>
@@ -676,92 +776,210 @@ export const RegisterPage: React.FC = () => {
           {isSuccess ? (
             <div className="relative overflow-hidden rounded-3xl border border-[#E9C578]/40 bg-[#061C14]/95 p-6 sm:p-10 backdrop-blur-2xl shadow-[0_0_50px_rgba(233,197,120,0.15)] text-center animate-fadeIn">
               {/* Decorative Corner Bells & Stars */}
-              <div className="absolute top-4 right-4 text-[#E9C578]/30 pointer-events-none">
+              <div className="no-print absolute top-4 right-4 text-[#E9C578]/30 pointer-events-none">
                 <Sparkles className="h-16 w-16" />
               </div>
-              <div className="absolute bottom-4 left-4 text-[#25A18E]/20 pointer-events-none">
+              <div className="no-print absolute bottom-4 left-4 text-[#25A18E]/20 pointer-events-none">
                 <Trees className="h-20 w-20" />
               </div>
 
-              <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-tr from-[#123D2B] via-[#0E3526] to-[#E9C578]/30 border-2 border-[#E9C578] shadow-[0_0_30px_rgba(233,197,120,0.3)]">
+              <div className="no-print mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-tr from-[#123D2B] via-[#0E3526] to-[#E9C578]/30 border-2 border-[#E9C578] shadow-[0_0_30px_rgba(233,197,120,0.3)]">
                 <Check className="h-10 w-10 text-[#FFD700]" />
               </div>
 
-              <span className="font-mono text-xs uppercase tracking-widest text-[#E9C578] font-bold">
+              <span className="no-print font-mono text-xs uppercase tracking-widest text-[#E9C578] font-bold">
                 Registration Confirmed
               </span>
-              <h2 className="mt-2 font-brand-display text-3xl sm:text-4xl font-bold text-[#FFFFFF]">
+              <h2 className="no-print mt-2 font-brand-display text-3xl sm:text-4xl font-bold text-[#FFFFFF]">
                 Registration Received!
               </h2>
-              <p className="mt-2 text-sm text-[#D9ECF5]/85 max-w-md mx-auto">
+              <p className="no-print mt-2 text-sm text-[#D9ECF5]/85 max-w-md mx-auto">
                 Congratulations! Team <strong>"{formData.teamName}"</strong> has been registered.
                 Our organizing jury will verify your transaction and send your entry badge via email.
               </p>
 
-              {/* Registration Receipt Card */}
-              <div className="mt-8 rounded-2xl border border-[#E9C578]/30 bg-[#0A261D]/90 p-5 sm:p-6 text-left max-w-lg mx-auto shadow-inner">
-                <div className="flex items-center justify-between border-b border-[#E9C578]/20 pb-3 mb-4">
+              {/* Registration Slip Container (Optimized for Screen & Isolated for Print) */}
+              <div className="registration-print-slip mt-8 rounded-2xl border border-[#E9C578]/30 bg-[#0A261D]/90 p-5 sm:p-6 text-left max-w-2xl mx-auto shadow-inner">
+                {/* Slip Header */}
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-[#E9C578]/20 pb-4 mb-4 gap-3 print-border-b">
                   <div>
-                    <span className="text-[11px] font-mono uppercase text-[#D9ECF5]/60 block">
-                      Registration ID
-                    </span>
-                    <span className="font-mono text-base font-bold text-[#FFD700]">
-                      {registrationId}
+                    <div className="flex items-center gap-2 mb-1">
+                      <Trees className="h-5 w-5 text-[#E9C578] print:text-[#09271E]" />
+                      <span className="font-brand-display text-lg font-bold text-[#FFFFFF] print-brand-title">
+                        Festive Christmas Hackathon 2026
+                      </span>
+                    </div>
+                    <span className="text-[11px] font-mono text-[#D9ECF5]/70 block print:text-[#4B5563]">
+                      8-Hour Sprint • Dec 25, 2026 • Indore, Madhya Pradesh, India
                     </span>
                   </div>
-                  <button
-                    onClick={handleCopyId}
-                    className="flex items-center gap-1.5 text-xs font-mono text-[#E9C578] hover:text-[#FFFFFF] bg-[#061C14] px-2.5 py-1.5 rounded-lg border border-[#E9C578]/30 transition-colors"
-                  >
-                    <Copy className="h-3.5 w-3.5" />
-                    <span>{copiedId ? 'Copied!' : 'Copy'}</span>
-                  </button>
+
+                  <div className="flex items-center gap-2">
+                    <div className="text-right">
+                      <span className="text-[10px] font-mono uppercase text-[#D9ECF5]/60 block print:text-[#4B5563]">
+                        Registration ID
+                      </span>
+                      <span className="font-mono text-sm sm:text-base font-bold text-[#FFD700] print-text-gold">
+                        {registrationId}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleCopyId}
+                      className="no-print flex items-center gap-1 text-xs font-mono text-[#E9C578] hover:text-[#FFFFFF] bg-[#061C14] px-2 py-1 rounded-lg border border-[#E9C578]/30 transition-colors"
+                      title="Copy Registration ID"
+                    >
+                      <Copy className="h-3 w-3" />
+                      <span>{copiedId ? 'Copied' : 'Copy'}</span>
+                    </button>
+                  </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4 text-xs font-mono">
+                {/* Team & Track Overview */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs font-mono pb-4 border-b border-[#E9C578]/15 print-border-b">
                   <div>
-                    <span className="text-[#D9ECF5]/60 block">Team Name</span>
-                    <span className="text-[#FFFFFF] font-semibold">{formData.teamName}</span>
+                    <span className="text-[#D9ECF5]/60 block print:text-[#4B5563]">Team Name</span>
+                    <span className="text-[#FFFFFF] font-semibold text-sm print:text-[#111827]">
+                      {formData.teamName}
+                    </span>
                   </div>
                   <div>
-                    <span className="text-[#D9ECF5]/60 block">Team Size</span>
-                    <span className="text-[#FFD700] font-semibold">
+                    <span className="text-[#D9ECF5]/60 block print:text-[#4B5563]">Roster Size</span>
+                    <span className="text-[#FFD700] font-semibold print-text-gold">
                       {selectedSizeConfig.label} ({selectedSizeConfig.memberCount} Members)
                     </span>
                   </div>
                   <div>
-                    <span className="text-[#D9ECF5]/60 block">Team Leader</span>
-                    <span className="text-[#FFFFFF]">{formData.leaderName}</span>
-                  </div>
-                  <div>
-                    <span className="text-[#D9ECF5]/60 block">Leader Email</span>
-                    <span className="text-[#FFFFFF] truncate block">{formData.leaderEmail}</span>
-                  </div>
-                  <div>
-                    <span className="text-[#D9ECF5]/60 block">Domain Track</span>
-                    <span className="text-[#E9C578] truncate block">
+                    <span className="text-[#D9ECF5]/60 block print:text-[#4B5563]">Technical Domain</span>
+                    <span className="text-[#E9C578] font-medium print:text-[#111827]">
                       {formData.technicalDomain}
                     </span>
                   </div>
                   <div>
-                    <span className="text-[#D9ECF5]/60 block">Fee Paid</span>
-                    <span className="text-[#25A18E] font-bold">₹{REGISTRATION_FEE_INR}</span>
-                  </div>
-                  <div className="col-span-2 pt-2 border-t border-[#E9C578]/15">
-                    <span className="text-[#D9ECF5]/60 block">Transaction Reference / UTR</span>
-                    <span className="text-[#FFD700] font-bold break-all">
-                      {formData.transactionId}
+                    <span className="text-[#D9ECF5]/60 block print:text-[#4B5563]">Location</span>
+                    <span className="text-[#FFFFFF] print:text-[#111827]">
+                      {formData.city}, {formData.state}
                     </span>
                   </div>
                 </div>
+
+                {/* Team Leader & Members Section */}
+                <div className="pt-3 pb-3 border-b border-[#E9C578]/15 print-border-b">
+                  <span className="text-[11px] font-mono font-semibold uppercase text-[#FFEA9F] block mb-2 print:text-[#09271E]">
+                    Team Roster Details
+                  </span>
+                  <div className="space-y-2 text-xs font-mono">
+                    {/* Leader */}
+                    <div className="rounded-lg bg-[#061C14]/50 p-2 border border-[#E9C578]/15 print-bg-subtle">
+                      <span className="text-[10px] uppercase font-bold text-[#E9C578] print-text-gold">
+                        Team Leader:
+                      </span>{' '}
+                      <span className="text-[#FFFFFF] font-semibold print:text-[#111827]">
+                        {formData.leaderName}
+                      </span>{' '}
+                      • <span className="text-[#D9ECF5]/80 print:text-[#4B5563]">{formData.leaderPhone}</span>{' '}
+                      • <span className="text-[#D9ECF5]/80 print:text-[#4B5563]">{formData.leaderEmail}</span>
+                      <div className="text-[10px] text-[#D9ECF5]/60 mt-0.5 print:text-[#4B5563]">
+                        {formData.leaderCollege} | {formData.leaderDegree} - {formData.leaderBranch} ({formData.leaderYear})
+                      </div>
+                    </div>
+
+                    {/* Member 2 */}
+                    {selectedSizeConfig.memberCount >= 2 && formData.member2Name && (
+                      <div className="rounded-lg bg-[#061C14]/50 p-2 border border-[#E9C578]/15 print-bg-subtle">
+                        <span className="text-[10px] uppercase font-bold text-[#25A18E] print-text-emerald">
+                          Member 2:
+                        </span>{' '}
+                        <span className="text-[#FFFFFF] font-semibold print:text-[#111827]">
+                          {formData.member2Name}
+                        </span>{' '}
+                        • <span className="text-[#D9ECF5]/80 print:text-[#4B5563]">{formData.member2Phone}</span>{' '}
+                        • <span className="text-[#D9ECF5]/80 print:text-[#4B5563]">{formData.member2Email}</span>
+                      </div>
+                    )}
+
+                    {/* Member 3 */}
+                    {selectedSizeConfig.memberCount >= 3 && formData.member3Name && (
+                      <div className="rounded-lg bg-[#061C14]/50 p-2 border border-[#E9C578]/15 print-bg-subtle">
+                        <span className="text-[10px] uppercase font-bold text-[#FFB703] print-text-gold">
+                          Member 3:
+                        </span>{' '}
+                        <span className="text-[#FFFFFF] font-semibold print:text-[#111827]">
+                          {formData.member3Name}
+                        </span>{' '}
+                        • <span className="text-[#D9ECF5]/80 print:text-[#4B5563]">{formData.member3Phone}</span>{' '}
+                        • <span className="text-[#D9ECF5]/80 print:text-[#4B5563]">{formData.member3Email}</span>
+                      </div>
+                    )}
+
+                    {/* Member 4 */}
+                    {selectedSizeConfig.memberCount >= 4 && formData.member4Name && (
+                      <div className="rounded-lg bg-[#061C14]/50 p-2 border border-[#E9C578]/15 print-bg-subtle">
+                        <span className="text-[10px] uppercase font-bold text-[#FFD700] print-text-gold">
+                          Member 4:
+                        </span>{' '}
+                        <span className="text-[#FFFFFF] font-semibold print:text-[#111827]">
+                          {formData.member4Name}
+                        </span>{' '}
+                        • <span className="text-[#D9ECF5]/80 print:text-[#4B5563]">{formData.member4Phone}</span>{' '}
+                        • <span className="text-[#D9ECF5]/80 print:text-[#4B5563]">{formData.member4Email}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Tech Stack Summary */}
+                <div className="pt-3 pb-3 border-b border-[#E9C578]/15 text-xs font-mono print-border-b">
+                  <span className="text-[11px] font-semibold uppercase text-[#FFEA9F] block mb-1 print:text-[#09271E]">
+                    Technical Stack
+                  </span>
+                  <div className="text-[#D9ECF5]/80 print:text-[#111827]">
+                    <span className="font-semibold text-[#FFFFFF] print:text-[#111827]">Languages:</span>{' '}
+                    {formData.programmingLanguages || 'Not specified'} |{' '}
+                    <span className="font-semibold text-[#FFFFFF] print:text-[#111827]">Frameworks:</span>{' '}
+                    {formData.frameworks || 'Not specified'}
+                  </div>
+                </div>
+
+                {/* Payment Verification Block */}
+                <div className="pt-3 grid grid-cols-2 gap-3 text-xs font-mono">
+                  <div>
+                    <span className="text-[#D9ECF5]/60 block print:text-[#4B5563]">Registration Fee</span>
+                    <span className="text-[#25A18E] font-bold text-sm print-text-emerald">
+                      ₹{REGISTRATION_FEE_INR} (Paid)
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[#D9ECF5]/60 block print:text-[#4B5563]">Verification Status</span>
+                    <span className="text-[#FFD700] font-semibold print-text-gold">
+                      PENDING VERIFICATION
+                    </span>
+                  </div>
+                  <div className="col-span-2 pt-1">
+                    <span className="text-[#D9ECF5]/60 block print:text-[#4B5563]">
+                      UPI Transaction / UTR Number
+                    </span>
+                    <span className="text-[#FFD700] font-bold text-sm break-all print:text-[#111827]">
+                      {formData.transactionId}
+                    </span>
+                  </div>
+                  <div className="col-span-2 pt-1 text-[11px] text-[#D9ECF5]/60 print:text-[#4B5563]">
+                    Payee: {PAYMENT_PAYEE_NAME} ({PAYMENT_UPI_ID})
+                  </div>
+                </div>
+
+                {/* Print Verification Footer Note */}
+                <div className="mt-4 pt-3 border-t border-[#E9C578]/15 text-[11px] font-mono text-[#D9ECF5]/60 text-center print:text-[#4B5563] print-border-b">
+                  Notice: Please carry this registration pass (printed or digital copy) along with valid college photo IDs during morning check-in at 09:00 AM on Dec 25, 2026.
+                </div>
               </div>
 
-              {/* Action Buttons */}
-              <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
+              {/* Action Buttons (Strictly Hidden During Print via .no-print and button tag) */}
+              <div className="no-print mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
                 <button
                   type="button"
                   onClick={handlePrintSlip}
-                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl border border-[#E9C578]/40 bg-[#0A261D] px-6 py-3 text-sm font-semibold text-[#E9C578] transition-all hover:bg-[#123D2B] hover:border-[#E9C578]"
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl border border-[#E9C578]/40 bg-[#0A261D] px-6 py-3 text-sm font-semibold text-[#E9C578] transition-all hover:bg-[#123D2B] hover:border-[#E9C578] cursor-pointer"
                 >
                   <Printer className="h-4 w-4" />
                   <span>Print Registration Slip</span>
