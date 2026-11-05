@@ -1,0 +1,121 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
+  <defs>
+    <!-- Background Gradient -->
+    <linearGradient id="skyGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#04120D"/>
+      <stop offset="50%" stop-color="#09271E"/>
+      <stop offset="100%" stop-color="#030C08"/>
+    </linearGradient>
+
+    <!-- Golden Aura -->
+    <radialGradient id="centerGlow" cx="50%" cy="45%" r="45%">
+      <stop offset="0%" stop-color="#E9C578" stop-opacity="0.22"/>
+      <stop offset="60%" stop-color="#123D2B" stop-opacity="0.1"/>
+      <stop offset="100%" stop-color="#09271E" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Star Glow -->
+    <radialGradient id="starGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#FFF4DF" stop-opacity="1"/>
+      <stop offset="40%" stop-color="#FFD700" stop-opacity="0.8"/>
+      <stop offset="100%" stop-color="#E9C578" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- Sky Canvas -->
+  <rect width="1200" height="630" fill="url(#skyGrad)"/>
+
+  <!-- Radial Golden Aura in Center -->
+  <rect width="1200" height="630" fill="url(#centerGlow)"/>
+
+  <!-- Stars & Snowflakes in Sky -->
+  <g fill="#FFF4DF" opacity="0.75">
+    <circle cx="120" cy="80" r="1.5" />
+    <circle cx="280" cy="120" r="2" />
+    <circle cx="450" cy="65" r="1.5" />
+    <circle cx="680" cy="90" r="2" />
+    <circle cx="890" cy="70" r="1.5" />
+    <circle cx="1040" cy="110" r="2.5" />
+    <circle cx="150" cy="220" r="2" />
+    <circle cx="980" cy="260" r="1.5" />
+    <circle cx="1120" cy="190" r="2" />
+    <circle cx="80" cy="380" r="1.5" />
+    <circle cx="1080" cy="390" r="2" />
+  </g>
+
+  <!-- Distant Mountain / Snowy Drift Silhouette -->
+  <path d="M0,520 Q300,470 600,510 T1200,480 L1200,630 L0,630 Z" fill="#061811" opacity="0.9"/>
+  <path d="M0,560 Q400,530 800,570 T1200,540 L1200,630 L0,630 Z" fill="#04120D"/>
+
+  <!-- Evergreen Pine Silhouettes (Left) -->
+  <g fill="#0B2B1F">
+    <!-- Tree 1 -->
+    <polygon points="120,400 70,520 170,520" />
+    <polygon points="120,340 85,430 155,430" />
+    <polygon points="120,290 95,360 145,360" />
+    <!-- Tree 2 -->
+    <polygon points="50,440 10,550 90,550" />
+    <polygon points="50,390 20,460 80,460" />
+  </g>
+
+  <!-- Evergreen Pine Silhouettes (Right) -->
+  <g fill="#0B2B1F">
+    <!-- Tree 3 -->
+    <polygon points="1080,390 1030,520 1130,520" />
+    <polygon points="1080,330 1045,420 1115,420" />
+    <polygon points="1080,280 1055,350 1105,350" />
+    <!-- Tree 4 -->
+    <polygon points="1150,430 1110,540 1190,540" />
+  </g>
+
+  <!-- Outer Golden Holiday Border Accent -->
+  <rect x="24" y="24" width="1152" height="582" rx="20" fill="none" stroke="#E9C578" stroke-width="1.5" stroke-opacity="0.4"/>
+  <rect x="32" y="32" width="1136" height="566" rx="14" fill="none" stroke="#E9C578" stroke-width="0.75" stroke-dasharray="4 6" stroke-opacity="0.3"/>
+
+  <!-- Header Badge: "GLOBAL WINTER HACKATHON 2026" -->
+  <g transform="translate(600, 130)">
+    <rect x="-180" y="-20" width="360" height="40" rx="20" fill="#0D3425" stroke="#E9C578" stroke-width="1.2" stroke-opacity="0.6"/>
+    <text x="0" y="5" font-family="'Courier New', monospace, sans-serif" font-size="14" font-weight="bold" fill="#FFEA9F" text-anchor="middle" letter-spacing="3">✦ GLOBAL WINTER HACKATHON 2026 ✦</text>
+  </g>
+
+  <!-- Main Hero Brand Typography: "Festive Christmas" -->
+  <text x="600" y="260" font-family="Georgia, 'Times New Roman', serif" font-size="82" font-weight="900" fill="#FFFFFF" text-anchor="middle" letter-spacing="-1">
+    Festive Christmas
+  </text>
+
+  <!-- Subtitle Tagline -->
+  <text x="600" y="325" font-family="'Helvetica Neue', Arial, sans-serif" font-size="26" font-weight="500" fill="#E9C578" text-anchor="middle" letter-spacing="1">
+    Build Something Extraordinary This Winter
+  </text>
+
+  <!-- Supporting Event Description -->
+  <text x="600" y="375" font-family="'Helvetica Neue', Arial, sans-serif" font-size="18" fill="#D9ECF5" opacity="0.85" text-anchor="middle">
+    A 48-Hour Solstice Sprint of Creativity, Collaboration &amp; Code
+  </text>
+
+  <!-- Highlight Chips (Date, Location, Prize Pool) -->
+  <g transform="translate(600, 460)">
+    <!-- Chip 1: Date -->
+    <g transform="translate(-320, 0)">
+      <rect x="-105" y="-22" width="210" height="44" rx="22" fill="#082016" stroke="#E9C578" stroke-width="1" stroke-opacity="0.5"/>
+      <text x="0" y="6" font-family="'Courier New', monospace, sans-serif" font-size="13" font-weight="bold" fill="#FFF4DF" text-anchor="middle">DEC 18–20, 2026</text>
+    </g>
+
+    <!-- Chip 2: Format -->
+    <g transform="translate(0, 0)">
+      <rect x="-120" y="-22" width="240" height="44" rx="22" fill="#082016" stroke="#88D4B0" stroke-width="1" stroke-opacity="0.5"/>
+      <text x="0" y="6" font-family="'Courier New', monospace, sans-serif" font-size="13" font-weight="bold" fill="#88D4B0" text-anchor="middle">GLOBAL VIRTUAL • 18:00 UTC</text>
+    </g>
+
+    <!-- Chip 3: Prize Pool -->
+    <g transform="translate(320, 0)">
+      <rect x="-115" y="-22" width="230" height="44" rx="22" fill="#C62835" stroke="#FFF4DF" stroke-width="1" stroke-opacity="0.4"/>
+      <text x="0" y="6" font-family="'Courier New', monospace, sans-serif" font-size="13" font-weight="bold" fill="#FFFFFF" text-anchor="middle">$50,000 PRIZE POOL</text>
+    </g>
+  </g>
+
+  <!-- Bottom Solstice Attribution -->
+  <text x="600" y="555" font-family="'Courier New', monospace, sans-serif" font-size="13" fill="#E9C578" opacity="0.8" text-anchor="middle" letter-spacing="1.5">
+    festivechristmas.dev • Registration Open Now
+  </text>
+</svg>

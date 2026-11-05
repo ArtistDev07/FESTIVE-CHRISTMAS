@@ -1,0 +1,21 @@
+@import "tailwindcss";
+@import "./styles/festive-tokens.css";
+@import "./styles/festive-hero.css";
+@import "./styles/festive-navigation.css";
+
+html, body {
+  background-color: #09271E;
+  color: #FFF4DF;
+  font-family: var(--font-body, 'Manrope', system-ui, -apple-system, sans-serif);
+  overflow-x: hidden;
+  margin: 0;
+  padding: 0;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Ensure accessible focus styles across all components */
+*:focus-visible {
+  outline: 2px solid #E9C578;
+  outline-offset: 3px;
+}

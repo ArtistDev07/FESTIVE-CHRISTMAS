@@ -1,0 +1,102 @@
+/* Hero Specific Styles & Glass Treatments */
+
+.hero-glass-panel {
+  background: rgba(14, 45, 33, 0.72);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(233, 197, 120, 0.28);
+  box-shadow: 0 16px 40px -8px rgba(4, 20, 15, 0.65), 0 0 20px 0 rgba(233, 197, 120, 0.08);
+}
+
+.hero-glass-pill {
+  background: rgba(9, 39, 30, 0.65);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(233, 197, 120, 0.22);
+}
+
+.hero-glass-pill:hover {
+  background: rgba(18, 61, 43, 0.85);
+  border-color: rgba(233, 197, 120, 0.45);
+}
+
+/* Primary Button with rich crimson gradient & golden sheen */
+.festive-btn-primary {
+  background: linear-gradient(135deg, #c62835 0%, #a41b26 50%, #87141f 100%);
+  color: #ffffff;
+  border: 1px solid rgba(233, 197, 120, 0.55);
+  box-shadow: 0 6px 20px -2px rgba(198, 40, 53, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  position: relative;
+  overflow: hidden;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.festive-btn-primary::after {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -60%;
+  width: 50%;
+  height: 200%;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.3) 50%,
+    transparent 100%
+  );
+  transform: rotate(25deg);
+  opacity: 0;
+  transition: opacity 0.2s;
+  pointer-events: none;
+}
+
+.festive-btn-primary:hover::after {
+  opacity: 1;
+  animation: shimmer-sweep 1.2s ease-in-out infinite;
+}
+
+.festive-btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 28px -4px rgba(198, 40, 53, 0.7), 0 0 15px rgba(233, 197, 120, 0.4);
+  border-color: rgba(233, 197, 120, 0.85);
+}
+
+.festive-btn-primary:active {
+  transform: translateY(0);
+}
+
+/* Secondary Button with evergreen frost glass */
+.festive-btn-secondary {
+  background: rgba(18, 61, 43, 0.6);
+  color: #fff4df;
+  border: 1px solid rgba(233, 197, 120, 0.35);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 6px 20px -4px rgba(9, 39, 30, 0.6);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.festive-btn-secondary:hover {
+  background: rgba(26, 78, 56, 0.85);
+  color: #ffffff;
+  border-color: rgba(233, 197, 120, 0.7);
+  transform: translateY(-2px);
+  box-shadow: 0 10px 24px -4px rgba(9, 39, 30, 0.8), 0 0 14px rgba(233, 197, 120, 0.2);
+}
+
+.festive-btn-secondary:active {
+  transform: translateY(0);
+}
+
+/* Snowcap decorative top ornament on cards */
+.snowcap-trim {
+  position: absolute;
+  top: -6px;
+  left: 12px;
+  right: 12px;
+  height: 12px;
+  background: radial-gradient(ellipse at 50% 100%, #ffffff 60%, rgba(255, 255, 255, 0) 100%);
+  border-radius: 9999px;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
+  pointer-events: none;
+}

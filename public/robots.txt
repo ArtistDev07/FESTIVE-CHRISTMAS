@@ -1,0 +1,6 @@
+# Festive Christmas Hackathon
+User-agent: *
+Allow: /
+
+# Canonical Sitemap
+Sitemap: https://festivechristmas.dev/sitemap.xml

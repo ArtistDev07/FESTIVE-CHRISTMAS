@@ -1,0 +1,6 @@
+{
+  "name": "Festive Christmas Hackathon",
+  "description": "An interactive, magical Christmas-themed hackathon and winter event platform.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

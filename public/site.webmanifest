@@ -1,0 +1,17 @@
+{
+  "name": "Festive Christmas Hackathon 2026",
+  "short_name": "Festive Christmas",
+  "description": "An interactive, magical Christmas-themed hackathon and winter event platform.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#09271E",
+  "theme_color": "#09271E",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

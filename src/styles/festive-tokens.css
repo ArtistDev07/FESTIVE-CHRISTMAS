@@ -1,0 +1,193 @@
+/* Festive Christmas Design Tokens & Theme Variables */
+
+:root {
+  --color-evergreen: #123D2B;
+  --color-deep-forest: #09271E;
+  --color-festive-red: #C62835;
+  --color-candy-red: #EF4050;
+  --color-warm-cream: #FFF4DF;
+  --color-snow-white: #FFFFFF;
+  --color-winter-gold: #E9C578;
+  --color-muted-ice: #D9ECF5;
+
+  /* Centralized Typography Tokens:
+     - Primary H1 & Brand Wordmark: 'Mountains of Christmas' (creative festive display)
+     - All other elements (H2–H6, body, nav, buttons, cards, forms, badges): 'Manrope' & 'DM Sans'
+  */
+  --font-brand-display: 'Mountains of Christmas', cursive;
+  --font-sans-primary: 'Manrope', 'DM Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-section-heading: var(--font-sans-primary);
+  --font-body: var(--font-sans-primary);
+  --font-ui: var(--font-sans-primary);
+
+  /* Backward-compatible variables */
+  --font-festive: var(--font-brand-display);
+  --font-serif: var(--font-sans-primary);
+  --font-sans: var(--font-sans-primary);
+}
+
+/* Primary Display Font: Reserved strictly for H1 headings & brand wordmarks */
+h1,
+.font-brand-display,
+.brand-wordmark {
+  font-family: var(--font-brand-display);
+}
+
+.font-festive {
+  font-family: var(--font-brand-display);
+}
+
+/* Secondary headings & text utility classes: Clean, modern sans-serif */
+.font-section-heading {
+  font-family: var(--font-section-heading);
+  letter-spacing: -0.02em;
+}
+
+.font-serif-festive {
+  font-family: var(--font-section-heading);
+}
+
+.font-body {
+  font-family: var(--font-body);
+}
+
+.font-ui {
+  font-family: var(--font-ui);
+}
+
+.font-sans-festive {
+  font-family: var(--font-body);
+}
+
+/* Secondary headings H2 through H6 consistently use clean sans-serif */
+/* H1 remains reserved exclusively for the main brand display */
+h2, h3, h4, h5, h6 {
+  font-family: var(--font-section-heading);
+  letter-spacing: -0.02em;
+}
+
+/* Safety override: Non-H1 elements must never use handwritten/decorative script */
+h2.font-festive,
+h3.font-festive,
+h4.font-festive,
+h5.font-festive,
+h6.font-festive,
+p.font-festive,
+span.font-festive:not(.brand-wordmark) {
+  font-family: var(--font-section-heading);
+  letter-spacing: -0.02em;
+}
+
+/* Glow effects */
+.glow-gold {
+  filter: drop-shadow(0 0 16px rgba(233, 197, 120, 0.45));
+}
+
+.glow-warm {
+  filter: drop-shadow(0 0 20px rgba(255, 244, 223, 0.35));
+}
+
+.glow-red {
+  filter: drop-shadow(0 0 18px rgba(198, 40, 53, 0.5));
+}
+
+.text-shadow-festive {
+  text-shadow: 0 2px 14px rgba(9, 39, 30, 0.9), 0 0 24px rgba(233, 197, 120, 0.25);
+}
+
+.text-shadow-subtle {
+  text-shadow: 0 2px 8px rgba(4, 15, 11, 0.85);
+}
+
+/* Subtle continuous ambient animations */
+@keyframes festive-float {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-7px) rotate(1.2deg);
+  }
+}
+
+@keyframes festive-float-delayed {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-9px) rotate(-1.5deg);
+  }
+}
+
+@keyframes festive-twinkle {
+  0%, 100% {
+    opacity: 0.35;
+    transform: scale(0.9);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.15);
+  }
+}
+
+@keyframes cabin-light-pulse {
+  0%, 100% {
+    opacity: 0.85;
+    filter: drop-shadow(0 0 8px rgba(245, 158, 11, 0.7));
+  }
+  50% {
+    opacity: 1;
+    filter: drop-shadow(0 0 16px rgba(251, 191, 36, 0.95));
+  }
+}
+
+@keyframes shimmer-sweep {
+  0% {
+    transform: translateX(-100%) rotate(25deg);
+  }
+  100% {
+    transform: translateX(250%) rotate(25deg);
+  }
+}
+
+/* Continuous infinite marquee - never pauses or stops on hover, click, or touch */
+@keyframes festive-marquee-infinite {
+  0% {
+    transform: translate3d(0, 0, 0);
+  }
+  100% {
+    transform: translate3d(-50%, 0, 0);
+  }
+}
+
+.animate-infinite-marquee {
+  display: flex !important;
+  width: max-content !important;
+  animation: festive-marquee-infinite 32s linear infinite !important;
+  will-change: transform;
+}
+
+.animate-festive-float {
+  animation: festive-float 5s ease-in-out infinite;
+}
+
+.animate-festive-float-delayed {
+  animation: festive-float-delayed 6.5s ease-in-out infinite 1.5s;
+}
+
+.animate-twinkle {
+  animation: festive-twinkle 3s ease-in-out infinite;
+}
+
+.animate-cabin-light {
+  animation: cabin-light-pulse 3.8s ease-in-out infinite;
+}
+
+/* Accessibility: respect reduced motion preferences (excluding explicit continuous infinite loops) */
+@media (prefers-reduced-motion: reduce) {
+  .animate-festive-float,
+  .animate-festive-float-delayed,
+  .animate-twinkle,
+  .animate-cabin-light {
+    animation: none !important;
+  }
+}
