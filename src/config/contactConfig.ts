@@ -121,7 +121,7 @@ export const organizerInfo = {
   },
   sprintDates: '25 December 2026',
   responseStandard: 'Direct email support',
-  virtualHqLocation: 'Global Virtual Hub',
+  virtualHqLocation: 'Indore, Madhya Pradesh, India',
   activeCoverage: 'Active Support Desk',
 };
 

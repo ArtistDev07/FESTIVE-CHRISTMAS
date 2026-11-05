@@ -33,20 +33,70 @@ export interface TimelineNodeItem {
   highlights: string[];
 }
 
+// ============================================================================
+// UPDATED LANDING PAGE / CONTENT STRINGS (ACCURATE & CLEANED)
+// ============================================================================
+
+export const EVENT_TIMELINE_SCHEDULE = [
+  {
+    time: "09:00 AM – 09:30 AM",
+    title: "Check-in & Team Welcome",
+    description: "Morning Arrival & Team Registration Setup"
+  },
+  {
+    time: "09:30 AM – 10:00 AM",
+    title: "Opening Ceremony & Briefing",
+    description: "Official Hackathon Kickoff & Track Guidelines"
+  },
+  {
+    time: "10:00 AM – 01:00 PM",
+    title: "Sprint 1: Core Development",
+    description: "Deep Work, Architecture Scaffolding & MVP Core Building"
+  },
+  {
+    time: "01:00 PM – 02:00 PM",
+    title: "Festive Lunch & Sync",
+    description: "Nourishment & Mid-Sprint Mentor Feedback"
+  },
+  {
+    time: "02:00 PM – 03:30 PM",
+    title: "Sprint 2: Polish & Submissions",
+    description: "Bug Squashing, Final Code Polish & Deployment Freeze"
+  },
+  {
+    time: "03:30 PM – 04:30 PM",
+    title: "Demos & Jury Evaluation",
+    description: "Live Pitching & Architectural Reviews by Judges"
+  },
+  {
+    time: "04:30 PM – 05:00 PM",
+    title: "Awards & Closing Ceremony",
+    description: "Celebrating the Holiday Builders & Winners Announcement"
+  }
+];
+
+export const EVENT_METADATA = {
+  title: "Festive Christmas Hackathon 2026",
+  date: "25 December 2026",
+  time: "9:00 AM – 5:00 PM IST",
+  location: "Indore, Madhya Pradesh, India",
+  fee: 400
+};
+
 const SCHEDULE_NODES: TimelineNodeItem[] = [
   {
     id: 'node-01',
     stepNumber: '01',
     timeRange: '09:00 AM – 09:30 AM',
     duration: '30 Mins',
-    title: 'Check-in & Festive Coffee',
-    subtitle: 'Morning Arrival & Team Warmup',
+    title: 'Check-in & Team Welcome',
+    subtitle: 'Morning Arrival & Team Registration Setup',
     location: 'Winter Garden Lobby',
     icon: <Coffee className="h-4 w-4 text-[#E9C578]" />,
     row: 'top',
     colIndex: 0,
-    description: 'Badge pickup, warm peppermint mocha or hot cocoa, and team matchmaking.',
-    highlights: ['Badge verification', 'Hot cocoa & cinnamon pastries', 'Discord channels sync'],
+    description: 'Morning arrival, team registration setup, badge pickup, warm festive drinks, and team matchmaking.',
+    highlights: ['Badge verification', 'Hot cocoa & festive drinks', 'Discord channels sync'],
   },
   {
     id: 'node-02',
@@ -54,12 +104,12 @@ const SCHEDULE_NODES: TimelineNodeItem[] = [
     timeRange: '09:30 AM – 10:00 AM',
     duration: '30 Mins',
     title: 'Opening Ceremony & Briefing',
-    subtitle: 'Official Hackathon Kickoff',
+    subtitle: 'Official Hackathon Kickoff & Track Guidelines',
     location: 'Main Auditorium',
     icon: <Sparkles className="h-4 w-4 text-[#FFD700]" />,
     row: 'top',
     colIndex: 1,
-    description: 'Welcome address, track themes reveal, judging rubrics, and platform guidelines.',
+    description: 'Official hackathon kickoff, track guidelines, judging rubrics, and platform briefing.',
     highlights: ['Organizers welcome address', 'Judging rubrics reveal', 'Mentor introductions'],
   },
   {
@@ -68,12 +118,12 @@ const SCHEDULE_NODES: TimelineNodeItem[] = [
     timeRange: '10:00 AM – 01:00 PM',
     duration: '3 Hours',
     title: 'Sprint 1: Core Development',
-    subtitle: 'Deep Work & Architecture Scaffolding',
+    subtitle: 'Deep Work, Architecture Scaffolding & MVP Core Building',
     location: 'Innovation Pods',
     icon: <Laptop className="h-4 w-4 text-[#25A18E]" />,
     row: 'top',
     colIndex: 2,
-    description: 'Intensive hacking begins. Setup repositories, scaffold APIs, and build the MVP core.',
+    description: 'Deep work, architecture scaffolding, MVP core building, and repository setup.',
     highlights: ['Architecture locked', 'Sprint Checkpoint 1', 'Technical mentors available'],
   },
   {
@@ -82,12 +132,12 @@ const SCHEDULE_NODES: TimelineNodeItem[] = [
     timeRange: '01:00 PM – 02:00 PM',
     duration: '60 Mins',
     title: 'Festive Lunch & Sync',
-    subtitle: 'Nourishment & Mid-Sprint Feedback',
+    subtitle: 'Nourishment & Mid-Sprint Mentor Feedback',
     location: 'Holiday Feast Hall',
     icon: <UtensilsCrossed className="h-4 w-4 text-[#EF4050]" />,
     row: 'top',
     colIndex: 3,
-    description: 'Catered banquet lunch, quick physical stretch, and 1-on-1 mentor sanity check.',
+    description: 'Nourishment, festive lunch, team recharge, and mid-sprint mentor feedback.',
     highlights: ['Gourmet festive buffet', '1-on-1 mentor consultations', 'Team energy recharge'],
   },
   {
@@ -96,12 +146,12 @@ const SCHEDULE_NODES: TimelineNodeItem[] = [
     timeRange: '02:00 PM – 03:30 PM',
     duration: '90 Mins',
     title: 'Sprint 2: Polish & Submissions',
-    subtitle: 'Bug Squashing & Deployment Freeze',
+    subtitle: 'Bug Squashing, Final Code Polish & Deployment Freeze',
     location: 'Innovation Pods',
     icon: <Rocket className="h-4 w-4 text-[#FFB703]" />,
     row: 'bottom',
     colIndex: 2, // aligned with col 2
-    description: 'Feature freeze, UI polish, edge-case fixes, demo video recording, and portal submission.',
+    description: 'Bug squashing, final code polish, edge-case fixes, demo recordings, and deployment freeze.',
     highlights: ['Live cloud deployment', 'Demo recording & slides', 'Code freeze at 03:30 PM'],
   },
   {
@@ -110,12 +160,12 @@ const SCHEDULE_NODES: TimelineNodeItem[] = [
     timeRange: '03:30 PM – 04:30 PM',
     duration: '60 Mins',
     title: 'Demos & Jury Evaluation',
-    subtitle: 'Live Pitching & Architectural Reviews',
+    subtitle: 'Live Pitching & Architectural Reviews by Judges',
     location: 'Main Auditorium',
     icon: <Presentation className="h-4 w-4 text-[#5BE3CC]" />,
     row: 'bottom',
     colIndex: 1, // aligned with col 1
-    description: '3-minute live presentations followed by 2 minutes of jury Q&A and technical evaluation.',
+    description: 'Live pitching, architectural reviews by judges, technical scoring, and Q&A.',
     highlights: ['Live interactive demos', 'Scoring on UX, Code & Impact', 'Audience choice voting'],
   },
   {
@@ -124,12 +174,12 @@ const SCHEDULE_NODES: TimelineNodeItem[] = [
     timeRange: '04:30 PM – 05:00 PM',
     duration: '30 Mins',
     title: 'Awards & Closing Ceremony',
-    subtitle: 'Celebrating the Holiday Builders',
+    subtitle: 'Celebrating the Holiday Builders & Winners Announcement',
     location: 'Main Stage & Pavilion',
     icon: <Trophy className="h-4 w-4 text-[#FFD700]" />,
     row: 'bottom',
     colIndex: 0, // aligned with col 0
-    description: 'Gold, Silver, Bronze trophy announcements, surprise gifts, group photos, and celebration.',
+    description: 'Celebrating holiday builders, winners announcement, trophy distribution, and closing remarks.',
     highlights: ['Podium winners crowned', 'Mystery gift prize reveals', 'Holiday farewell & photos'],
   },
 ];
