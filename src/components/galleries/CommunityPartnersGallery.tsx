@@ -6,50 +6,40 @@ interface CommunityPartnersGalleryProps {
   partners?: CommunityPartnerItem[];
 }
 
-const DEFAULT_COMMUNITY_PARTNERS: { name: string; imageUrl: string }[] = [
-  {
-    name: 'Pydata Indore',
-    imageUrl: 'https://i.pinimg.com/736x/e5/65/af/e565af1ba2982df410589b1c57f9597a.jpg',
-  },
-  {
-    name: 'CloudDevOps',
-    imageUrl: 'https://i.pinimg.com/736x/f8/19/a2/f819a2f609a2371f873869a224af10de.jpg',
-  },
-  {
-    name: 'Cloud Native Indore',
-    imageUrl: 'https://i.pinimg.com/736x/47/0c/b0/470cb0410a207830c9d4188060d45221.jpg',
-  },
-  {
-    name: 'SlowBrosLabs',
-    imageUrl: 'https://i.pinimg.com/736x/95/a8/2e/95a82ed49e7e2ff3131ebd81e9197016.jpg',
-  },
-  {
-    name: 'Revel Soon',
-    imageUrl: 'https://i.pinimg.com/736x/74/95/0e/74950ebb5816a7035141d8d65b435a0d.jpg',
-  },
+export const COMMUNITY_PARTNER_IMAGE_URL =
+  'https://i.pinimg.com/736x/74/95/0e/74950ebb5816a7035141d8d65b435a0d.jpg';
+
+const DEFAULT_COMMUNITY_PARTNERS: { id: string; name: string; imageUrl: string }[] = [
+  { id: 'partner-01', name: 'Community Partner 01', imageUrl: COMMUNITY_PARTNER_IMAGE_URL },
+  { id: 'partner-02', name: 'Community Partner 02', imageUrl: COMMUNITY_PARTNER_IMAGE_URL },
+  { id: 'partner-03', name: 'Community Partner 03', imageUrl: COMMUNITY_PARTNER_IMAGE_URL },
+  { id: 'partner-04', name: 'Community Partner 04', imageUrl: COMMUNITY_PARTNER_IMAGE_URL },
+  { id: 'partner-05', name: 'Community Partner 05', imageUrl: COMMUNITY_PARTNER_IMAGE_URL },
 ];
 
 export const CommunityPartnersGallery: React.FC<CommunityPartnersGalleryProps> = ({ partners }) => {
-  // Use provided partners or default to the 5 specified community partners
+  // Use provided partners or default to the 5 specified community partner frames, all rendering the exact target image
   const activePartners = DEFAULT_COMMUNITY_PARTNERS.map((defaultItem, idx) => {
     const provided = partners && partners[idx];
     return {
-      id: provided?.id || `community-partner-${idx + 1}`,
+      id: provided?.id || defaultItem.id,
       name: provided?.name || defaultItem.name,
-      imageUrl: provided?.imageUrl || defaultItem.imageUrl,
+      imageUrl: COMMUNITY_PARTNER_IMAGE_URL,
     };
   });
 
   return (
     <div className="w-full select-none" onContextMenu={(e) => e.preventDefault()}>
-      {/* 5 Cards Grid - Strictly Uniform Fixed-Size Image Frames (1:1 Aspect Ratio) */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-6">
-        {activePartners.map((partner) => (
+      {/* 5 Cards Grid - Strictly Uniform Fixed-Size Image Frames Cleanly Centered Across Mobile, Tablet, and Desktop */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 sm:gap-6 justify-center items-center max-w-6xl mx-auto">
+        {activePartners.map((partner, idx) => (
           <div
             key={partner.id}
             aria-label={partner.name}
             onContextMenu={(e) => e.preventDefault()}
-            className="group relative flex flex-col items-center justify-center overflow-hidden rounded-3xl border border-[#E9C578]/30 bg-gradient-to-b from-[#0F3425]/90 via-[#0A261D]/90 to-[#061811] p-3 shadow-[0_10px_30px_rgba(4,20,15,0.7)] backdrop-blur-xl transition-all duration-500 hover:-translate-y-2 hover:border-[#E9C578] hover:shadow-[0_20px_50px_rgba(233,197,120,0.3)] cursor-default select-none"
+            className={`group relative flex flex-col items-center justify-center overflow-hidden rounded-3xl border border-[#E9C578]/30 bg-gradient-to-b from-[#0F3425]/90 via-[#0A261D]/90 to-[#061811] p-3 sm:p-3.5 shadow-[0_10px_30px_rgba(4,20,15,0.7)] backdrop-blur-xl transition-all duration-500 hover:-translate-y-2 hover:border-[#E9C578] hover:shadow-[0_20px_50px_rgba(233,197,120,0.3)] cursor-default select-none ${
+              idx === 4 ? 'col-span-2 sm:col-span-1 lg:col-span-1 max-w-[200px] sm:max-w-none justify-self-center sm:justify-self-auto' : ''
+            }`}
           >
             <CardCornerBrackets color="#E9C578" />
 
@@ -65,7 +55,7 @@ export const CommunityPartnersGallery: React.FC<CommunityPartnersGalleryProps> =
               onContextMenu={(e) => e.preventDefault()}
             >
               <img
-                src={partner.imageUrl}
+                src={COMMUNITY_PARTNER_IMAGE_URL}
                 alt={partner.name}
                 draggable={false}
                 onContextMenu={(e) => e.preventDefault()}
