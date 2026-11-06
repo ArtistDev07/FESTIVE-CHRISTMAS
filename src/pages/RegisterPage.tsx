@@ -456,12 +456,9 @@ export const RegisterPage: React.FC = () => {
 
     if (step === 5) {
       const cleanTx = formData.transactionId.trim();
-      if (!cleanTx) {
+      if (!cleanTx || !/^\d{12}$/.test(cleanTx)) {
         newErrors.transactionId =
-          'Mandatory: Please enter your 12-digit UPI Transaction / UTR Number.';
-      } else if (cleanTx.length < 6) {
-        newErrors.transactionId =
-          'Transaction ID is too short. Please verify from your UPI app receipt.';
+          'Invalid UTR: Transaction ID must be exactly 12 numeric digits.';
       }
     }
 
@@ -490,6 +487,15 @@ export const RegisterPage: React.FC = () => {
     e.preventDefault();
 
     if (!validateStep(5)) {
+      return;
+    }
+
+    const cleanUtr = formData.transactionId.trim();
+    if (!/^\d{12}$/.test(cleanUtr)) {
+      setErrors((prev) => ({
+        ...prev,
+        transactionId: 'Invalid UTR: Transaction ID must be exactly 12 numeric digits.',
+      }));
       return;
     }
 
@@ -541,18 +547,18 @@ export const RegisterPage: React.FC = () => {
       projectBrief: formData.projectBrief.trim(),
       // Step 5: Checkout
       registrationFeeINR: REGISTRATION_FEE_INR,
-      transactionId: formData.transactionId.trim(),
+      transactionId: cleanUtr,
       paymentStatus: 'PENDING_VERIFICATION',
     };
 
     try {
       // Send POST request to Google Apps Script Web App
-      // mode: 'no-cors' allows client-side dispatch without CORS preflight blocks
+      // mode: 'no-cors' with 'text/plain;charset=utf-8' allows client-side dispatch without CORS preflight blocks
       await fetch(GOOGLE_SCRIPT_WEB_APP_URL, {
         method: 'POST',
         mode: 'no-cors',
         headers: {
-          'Content-Type': 'application/json',
+          'Content-Type': 'text/plain;charset=utf-8',
         },
         body: JSON.stringify(payload),
       });
@@ -2156,31 +2162,53 @@ export const RegisterPage: React.FC = () => {
 
                     {/* Mandatory Input: Transaction ID / UTR Number placed neatly below UPI details */}
                     <div>
-                      <label
-                        htmlFor="transactionId"
-                        className="block text-xs font-mono font-semibold text-[#FFEA9F] mb-1.5 uppercase tracking-wider"
-                      >
-                        Transaction ID / UTR Number *
-                      </label>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <label
+                          htmlFor="transactionId"
+                          className="block text-xs font-mono font-semibold text-[#FFEA9F] uppercase tracking-wider"
+                        >
+                          Transaction ID / UTR Number (12 Digits) *
+                        </label>
+                        <span
+                          className={`font-mono text-[11px] px-2 py-0.5 rounded-full ${
+                            formData.transactionId.length === 12
+                              ? 'bg-[#25A18E]/20 text-[#25A18E] border border-[#25A18E]/40 font-bold'
+                              : 'bg-[#061C14] text-[#D9ECF5]/50 border border-[#E9C578]/20'
+                          }`}
+                        >
+                          {formData.transactionId.length}/12 Digits
+                        </span>
+                      </div>
                       <div className="relative">
                         <input
                           id="transactionId"
                           type="text"
+                          inputMode="numeric"
+                          maxLength={12}
                           value={formData.transactionId}
-                          onChange={(e) => updateField('transactionId', e.target.value)}
-                          placeholder="e.g. 434912345678 or UPI/CR/434912345678"
+                          onChange={(e) => {
+                            const digitsOnly = e.target.value.replace(/\D/g, '').slice(0, 12);
+                            updateField('transactionId', digitsOnly);
+                          }}
+                          placeholder="e.g. 434912345678"
                           className={`w-full rounded-xl border bg-[#0A261D]/90 pl-10 pr-4 py-3.5 text-sm font-mono text-[#FFFFFF] placeholder-[#D9ECF5]/35 backdrop-blur-sm transition-all focus:outline-none ${
                             errors.transactionId
                               ? 'border-[#EF4050] focus:ring-2 focus:ring-[#EF4050]/40'
+                              : formData.transactionId.length === 12
+                              ? 'border-[#25A18E] focus:ring-2 focus:ring-[#25A18E]/40'
                               : 'border-[#E9C578]/50 focus:border-[#E9C578] focus:ring-2 focus:ring-[#E9C578]/30'
                           }`}
                         />
                         <Receipt className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[#FFD700]" />
                       </div>
-                      {errors.transactionId && (
-                        <p className="mt-1 flex items-center gap-1 text-xs text-[#EF4050]">
-                          <AlertCircle className="h-3 w-3" />
+                      {errors.transactionId ? (
+                        <p className="mt-1.5 flex items-center gap-1.5 text-xs text-[#EF4050] font-mono">
+                          <AlertCircle className="h-3.5 w-3.5 shrink-0" />
                           <span>{errors.transactionId}</span>
+                        </p>
+                      ) : (
+                        <p className="mt-1 text-[11px] font-mono text-[#D9ECF5]/60">
+                          Please enter the 12-digit numeric reference number from your Google Pay, PhonePe, Paytm, or UPI receipt.
                         </p>
                       )}
                     </div>
