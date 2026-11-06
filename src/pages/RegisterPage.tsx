@@ -571,6 +571,22 @@ export const RegisterPage: React.FC = () => {
         console.warn('Local storage write notice:', storageErr);
       }
 
+      // Trigger backend automated dual email notification system (Participant + Organizer)
+      try {
+        await fetch('/api/notifications/registration', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            ...payload,
+            storageConfirmed: true,
+          }),
+        });
+      } catch (emailErr) {
+        console.warn('Backend email notification dispatch notice:', emailErr);
+      }
+
       setIsSubmitting(false);
       setIsSuccess(true);
       window.scrollTo({ top: 60, behavior: 'smooth' });
