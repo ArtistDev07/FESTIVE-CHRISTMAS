@@ -389,7 +389,7 @@ export async function dispatchRegistrationDualEmails(
 
   // 3. Idempotency Check (Test Gate 5 constraint):
   // Return cached result if already dispatched to prevent duplicate emails
-  if (processedRegistrations.has(regId) && !isSandbox) {
+  if (processedRegistrations.has(regId)) {
     console.log(`[EmailService:IDEMPOTENCY] Dedup hit for registrationId ${regId}. Skipping re-send.`);
     const cached = processedRegistrations.get(regId)!;
     return {
@@ -470,9 +470,7 @@ export async function dispatchRegistrationDualEmails(
   };
 
   // Cache response for idempotency
-  if (!isSandbox) {
-    processedRegistrations.set(regId, response);
-  }
+  processedRegistrations.set(regId, response);
 
   return response;
 }

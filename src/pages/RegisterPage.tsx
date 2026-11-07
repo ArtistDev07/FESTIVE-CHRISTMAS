@@ -42,14 +42,6 @@ import { FestiveBadge } from '../components/ui/FestiveBadge.tsx';
 // CONFIGURATION CONSTANTS
 // ============================================================================
 
-/**
- * Replace this placeholder with your deployed Google Apps Script Web App URL.
- * When submitted, this endpoint receives the full registration payload and appends
- * it as a new row in your connected Google Sheet.
- */
-export const GOOGLE_SCRIPT_WEB_APP_URL =
-  'https://script.google.com/macros/s/AKfycbx5sIBLF1mvrFmWp9jDueYdWgqUUITGMMZOrbrAIxRes0NymQGdfmicH0lTc7YJRl5njQ/exec';
-
 export const REGISTRATION_FEE_INR = 400;
 
 export const PAYMENT_PAYEE_NAME = 'Yogesh Sharma';
@@ -214,13 +206,36 @@ const INITIAL_FORM_DATA: RegistrationFormData = {
 
 export const RegisterPage: React.FC = () => {
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3 | 4 | 5>(1);
-  const [formData, setFormData] = useState<RegistrationFormData>(INITIAL_FORM_DATA);
+  const [formData, setFormData] = useState<RegistrationFormData>(() => {
+    try {
+      const savedDraft = localStorage.getItem('festive_hackathon_draft');
+      if (savedDraft) {
+        const parsed = JSON.parse(savedDraft);
+        return { ...INITIAL_FORM_DATA, ...parsed };
+      }
+    } catch {
+      // fallback to initial
+    }
+    return INITIAL_FORM_DATA;
+  });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [submissionError, setSubmissionError] = useState<string | null>(null);
   const [registrationId, setRegistrationId] = useState<string>('');
   const [copiedId, setCopiedId] = useState(false);
   const [copiedUpi, setCopiedUpi] = useState(false);
+
+  // Auto-save form draft so refreshing or accidental navigation never loses user progress
+  React.useEffect(() => {
+    if (!isSuccess) {
+      try {
+        localStorage.setItem('festive_hackathon_draft', JSON.stringify(formData));
+      } catch {
+        // localStorage unavailable
+      }
+    }
+  }, [formData, isSuccess]);
 
   const selectedSizeConfig =
     TEAM_SIZES.find((s) => s.id === formData.teamSize) || TEAM_SIZES[1];
@@ -482,9 +497,11 @@ export const RegisterPage: React.FC = () => {
     }
   };
 
-  // Final Form Submission Handler (Google Sheets POST via Apps Script)
+  // Final Form Submission Handler (Verified Backend & Google Sheets Integration)
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (isSubmitting) return;
 
     if (!validateStep(5)) {
       return;
@@ -500,6 +517,7 @@ export const RegisterPage: React.FC = () => {
     }
 
     setIsSubmitting(true);
+    setSubmissionError(null);
 
     const generatedId = `XMAS-${new Date().getFullYear()}-${Math.floor(
       100000 + Math.random() * 900000
@@ -552,18 +570,25 @@ export const RegisterPage: React.FC = () => {
     };
 
     try {
-      // Send POST request to Google Apps Script Web App
-      // mode: 'no-cors' with 'text/plain;charset=utf-8' allows client-side dispatch without CORS preflight blocks
-      await fetch(GOOGLE_SCRIPT_WEB_APP_URL, {
+      // 1. Submit through the verified server registration endpoint
+      const response = await fetch('/api/register', {
         method: 'POST',
-        mode: 'no-cors',
         headers: {
-          'Content-Type': 'text/plain;charset=utf-8',
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify(payload),
       });
 
-      // Save a local copy in browser storage so team details are never lost
+      const result = await response.json().catch(() => ({}));
+
+      if (!response.ok || !result.success) {
+        const errorMsg =
+          result.error ||
+          'Registration could not be confirmed in Google Sheets database. Please try again.';
+        throw new Error(errorMsg);
+      }
+
+      // 2. Save a local copy in browser storage so team details are never lost
       try {
         const stored = JSON.parse(
           localStorage.getItem('festive_hackathon_registrations') || '[]'
@@ -577,43 +602,33 @@ export const RegisterPage: React.FC = () => {
         console.warn('Local storage write notice:', storageErr);
       }
 
-      // Trigger backend automated dual email notification system (Participant + Organizer)
+      // Clear draft since registration was successfully accepted
       try {
-        await fetch('/api/notifications/registration', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            ...payload,
-            storageConfirmed: true,
-          }),
-        });
-      } catch (emailErr) {
-        console.warn('Backend email notification dispatch notice:', emailErr);
+        localStorage.removeItem('festive_hackathon_draft');
+      } catch {
+        // ignore
       }
 
       setIsSubmitting(false);
       setIsSuccess(true);
       window.scrollTo({ top: 60, behavior: 'smooth' });
-    } catch (err) {
-      console.error('Submission error (showing printable view):', err);
-      // Fallback: Proceed to success state since payload is cached locally and user can print slip
-      try {
-        const stored = JSON.parse(
-          localStorage.getItem('festive_hackathon_registrations') || '[]'
-        );
-        stored.push(payload);
-        localStorage.setItem(
-          'festive_hackathon_registrations',
-          JSON.stringify(stored)
-        );
-      } catch (storageErr) {
-        console.warn('Local storage write notice:', storageErr);
-      }
+    } catch (err: unknown) {
+      console.error('Registration submission error:', err);
+      // Strictly prevent false success: show error card in UI and allow retry
       setIsSubmitting(false);
-      setIsSuccess(true);
-      window.scrollTo({ top: 60, behavior: 'smooth' });
+      setIsSuccess(false);
+      setSubmissionError(
+        err instanceof Error
+          ? err.message
+          : 'Unable to confirm registration with the backend. Please check your connection and retry.'
+      );
+      // Ensure user details remain in form and cache locally as emergency draft
+      try {
+        localStorage.setItem('festive_hackathon_draft', JSON.stringify(payload));
+      } catch {
+        // ignore draft cache errors
+      }
+      window.scrollTo({ top: 300, behavior: 'smooth' });
     }
   };
 
@@ -2212,6 +2227,32 @@ export const RegisterPage: React.FC = () => {
                         </p>
                       )}
                     </div>
+
+                    {/* Submission Error & Diagnostics Alert */}
+                    {submissionError && (
+                      <div className="mt-6 rounded-2xl border border-[#EF4050]/50 bg-[#3B1219]/90 p-4 sm:p-5 shadow-[0_10px_30px_rgba(239,64,80,0.25)] backdrop-blur-md animate-fadeIn">
+                        <div className="flex items-start gap-3">
+                          <AlertCircle className="h-5 w-5 text-[#EF4050] shrink-0 mt-0.5" />
+                          <div className="flex-1">
+                            <h4 className="text-sm font-bold text-[#FFA0A0] flex items-center gap-2">
+                              <span>Registration Verification Issue</span>
+                              <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-[#EF4050]/20 text-[#FFC4C4] border border-[#EF4050]/40">
+                                Action Required
+                              </span>
+                            </h4>
+                            <p className="mt-1.5 text-xs text-[#FFF4DF] font-sans-festive leading-relaxed">
+                              {submissionError}
+                            </p>
+                            <p className="mt-2 text-[11px] font-mono text-[#D9ECF5]/75 border-t border-[#EF4050]/30 pt-2">
+                              Your entered form data and UTR (<span className="text-[#E9C578]">{formData.transactionId || 'N/A'}</span>) are safely preserved. Click &quot;Complete Registration&quot; below to retry, or contact the organizing committee directly at{' '}
+                              <a href="mailto:y.s8269773357@gmail.com" className="underline text-[#E9C578] hover:text-[#FFFFFF]">
+                                y.s8269773357@gmail.com
+                              </a>.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
 
