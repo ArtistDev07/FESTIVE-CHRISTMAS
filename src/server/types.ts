@@ -46,6 +46,9 @@ export interface RegistrationPayload {
   registrationFeeINR?: number;
   transactionId: string;
   paymentStatus?: string;
+  paymentScreenshotBase64?: string;
+  paymentScreenshotFileName?: string;
+  paymentScreenshotMimeType?: string;
 }
 
 export interface EmailDispatchResult {

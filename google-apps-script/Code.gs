@@ -402,6 +402,7 @@ function resolveValueByHeaderName(headerTitle, data, regId, dateFormatted) {
   if (h.indexOf("fee") !== -1 || h.indexOf("amount") !== -1) return data.registrationFeeINR || 400;
   if (h.indexOf("transaction") !== -1 || h.indexOf("utr") !== -1) return data.transactionId || "N/A";
   if (h.indexOf("payment") !== -1 || h.indexOf("status") !== -1) return data.paymentStatus || "PENDING_VERIFICATION";
+  if (h.indexOf("screenshot") !== -1 || h.indexOf("receipt") !== -1) return data.paymentScreenshotFileName || data.paymentScreenshotUrl || "N/A";
 
   return "N/A";
 }

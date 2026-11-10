@@ -34,6 +34,9 @@ import {
   Copy,
   Printer,
   Compass,
+  Upload,
+  Trash2,
+  Image as ImageIcon,
 } from 'lucide-react';
 import { FestiveContainer } from '../components/ui/FestiveContainer.tsx';
 import { FestiveBadge } from '../components/ui/FestiveBadge.tsx';
@@ -43,6 +46,9 @@ import { FestiveBadge } from '../components/ui/FestiveBadge.tsx';
 // ============================================================================
 
 export const REGISTRATION_FEE_INR = 400;
+
+export const GOOGLE_SCRIPT_WEB_APP_URL =
+  'https://script.google.com/macros/s/AKfycbx5sIBLF1mvrFmWp9jDueYdWgqUUITGMMZOrbrAIxRes0NymQGdfmicH0lTc7YJRl5njQ/exec';
 
 export const PAYMENT_PAYEE_NAME = 'Yogesh Sharma';
 export const PAYMENT_UPI_ID = 'yogeshsharma9425903357@oksbi';
@@ -164,6 +170,9 @@ export interface RegistrationFormData {
 
   // Step 5: Payment Verification
   transactionId: string; // Mandatory UTR / Transaction ID
+  paymentScreenshotBase64?: string;
+  paymentScreenshotFileName?: string;
+  paymentScreenshotMimeType?: string;
 }
 
 const INITIAL_FORM_DATA: RegistrationFormData = {
@@ -202,6 +211,9 @@ const INITIAL_FORM_DATA: RegistrationFormData = {
   projectBrief: '',
 
   transactionId: '',
+  paymentScreenshotBase64: '',
+  paymentScreenshotFileName: '',
+  paymentScreenshotMimeType: '',
 };
 
 export const RegisterPage: React.FC = () => {
@@ -225,6 +237,56 @@ export const RegisterPage: React.FC = () => {
   const [registrationId, setRegistrationId] = useState<string>('');
   const [copiedId, setCopiedId] = useState(false);
   const [copiedUpi, setCopiedUpi] = useState(false);
+
+  // Payment Screenshot State & Handlers
+  const [screenshotBase64, setScreenshotBase64] = useState<string>('');
+  const [screenshotFileName, setScreenshotFileName] = useState<string>('');
+  const [screenshotMimeType, setScreenshotMimeType] = useState<string>('');
+  const [screenshotPreview, setScreenshotPreview] = useState<string | null>(null);
+  const [screenshotError, setScreenshotError] = useState<string | null>(null);
+  const fileInputRef = React.useRef<HTMLInputElement | null>(null);
+
+  const handleScreenshotChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'];
+    if (!allowedTypes.includes(file.type.toLowerCase())) {
+      setScreenshotError('Please upload a valid image file (PNG, JPG, or WEBP).');
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setScreenshotError('File size exceeds 5MB limit. Please upload a smaller image.');
+      return;
+    }
+
+    setScreenshotError(null);
+    setScreenshotFileName(file.name);
+    setScreenshotMimeType(file.type);
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      setScreenshotPreview(result);
+      setScreenshotBase64(result);
+    };
+    reader.onerror = () => {
+      setScreenshotError('Failed to read the image file. Please try again.');
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemoveScreenshot = () => {
+    setScreenshotPreview(null);
+    setScreenshotBase64('');
+    setScreenshotFileName('');
+    setScreenshotMimeType('');
+    setScreenshotError(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
 
   // Auto-save form draft so refreshing or accidental navigation never loses user progress
   React.useEffect(() => {
@@ -567,6 +629,9 @@ export const RegisterPage: React.FC = () => {
       registrationFeeINR: REGISTRATION_FEE_INR,
       transactionId: cleanUtr,
       paymentStatus: 'PENDING_VERIFICATION',
+      paymentScreenshotBase64: screenshotBase64 || '',
+      paymentScreenshotFileName: screenshotFileName || '',
+      paymentScreenshotMimeType: screenshotMimeType || '',
     };
 
     try {
@@ -1003,6 +1068,12 @@ export const RegisterPage: React.FC = () => {
                   <div className="col-span-2 pt-1 text-[11px] text-[#D9ECF5]/60 print:text-[#4B5563]">
                     Payee: {PAYMENT_PAYEE_NAME} ({PAYMENT_UPI_ID})
                   </div>
+                  {screenshotFileName && (
+                    <div className="col-span-2 pt-1 text-[11px] text-[#25A18E] print:text-[#065F46] font-semibold flex items-center gap-1.5">
+                      <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+                      <span>Receipt Screenshot Attached: {screenshotFileName}</span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Print Verification Footer Note */}
@@ -2224,6 +2295,114 @@ export const RegisterPage: React.FC = () => {
                       ) : (
                         <p className="mt-1 text-[11px] font-mono text-[#D9ECF5]/60">
                           Please enter the 12-digit numeric reference number from your Google Pay, PhonePe, Paytm, or UPI receipt.
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Official Payment Receipt Screenshot Upload Field */}
+                    <div className="pt-1">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <label
+                          htmlFor="paymentScreenshot"
+                          className="block text-xs font-mono font-semibold text-[#FFEA9F] uppercase tracking-wider flex items-center gap-1.5"
+                        >
+                          <Upload className="h-3.5 w-3.5 text-[#E9C578]" />
+                          <span>Payment Receipt Screenshot</span>
+                        </label>
+                        <span className="font-mono text-[10px] text-[#D9ECF5]/60 bg-[#061C14] px-2 py-0.5 rounded-full border border-[#E9C578]/20">
+                          PNG, JPG, WEBP (Max 5MB)
+                        </span>
+                      </div>
+
+                      {/* Hidden actual file input */}
+                      <input
+                        ref={fileInputRef}
+                        id="paymentScreenshot"
+                        type="file"
+                        accept="image/png, image/jpeg, image/jpg, image/webp"
+                        onChange={handleScreenshotChange}
+                        className="hidden"
+                      />
+
+                      {/* Interactive Drag & Drop or Click Area */}
+                      {!screenshotPreview ? (
+                        <div
+                          onClick={() => fileInputRef.current?.click()}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              fileInputRef.current?.click();
+                            }
+                          }}
+                          role="button"
+                          tabIndex={0}
+                          className="group flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-[#E9C578]/40 bg-[#0A261D]/70 hover:bg-[#0E3526] hover:border-[#E9C578] transition-all p-5 sm:p-6 text-center cursor-pointer shadow-inner focus:outline-none focus:ring-2 focus:ring-[#E9C578]/40"
+                        >
+                          <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[#123D2B] text-[#E9C578] group-hover:scale-110 group-hover:bg-[#E9C578] group-hover:text-[#09271E] transition-all mb-2.5 shadow-md">
+                            <Upload className="h-5 w-5" />
+                          </div>
+                          <p className="text-xs sm:text-sm font-semibold text-[#FFFFFF] group-hover:text-[#FFD700] transition-colors">
+                            Click to upload payment receipt screenshot
+                          </p>
+                          <p className="text-[11px] font-mono text-[#D9ECF5]/60 mt-1 max-w-sm">
+                            Attach receipt showing the ₹{REGISTRATION_FEE_INR} transaction and UTR for expedited jury verification
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="rounded-2xl border border-[#25A18E]/50 bg-[#0A261D]/90 p-3.5 sm:p-4 backdrop-blur-md shadow-md animate-fadeIn">
+                          <div className="flex flex-col sm:flex-row items-center justify-between gap-3.5">
+                            {/* Preview thumbnail & file details */}
+                            <div className="flex items-center gap-3 w-full sm:w-auto min-w-0">
+                              <div className="relative h-16 w-16 sm:h-20 sm:w-20 shrink-0 rounded-xl overflow-hidden border border-[#E9C578]/40 bg-[#061C14] shadow-md">
+                                <img
+                                  src={screenshotPreview}
+                                  alt="Payment receipt preview"
+                                  className="h-full w-full object-cover"
+                                />
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-2">
+                                  <span className="inline-flex items-center gap-1 rounded bg-[#25A18E]/20 px-2 py-0.5 text-[10px] font-mono font-bold text-[#25A18E] border border-[#25A18E]/30">
+                                    <CheckCircle2 className="h-3 w-3" />
+                                    Screenshot Attached
+                                  </span>
+                                </div>
+                                <p className="mt-1 text-xs sm:text-sm font-mono font-semibold text-[#FFFFFF] truncate max-w-[200px] sm:max-w-xs">
+                                  {screenshotFileName}
+                                </p>
+                                <p className="text-[10px] font-mono text-[#D9ECF5]/60 mt-0.5">
+                                  Format: {screenshotMimeType || 'Image'}
+                                </p>
+                              </div>
+                            </div>
+
+                            {/* Action Buttons: Re-upload / Remove */}
+                            <div className="flex items-center gap-2 w-full sm:w-auto justify-end shrink-0">
+                              <button
+                                type="button"
+                                onClick={() => fileInputRef.current?.click()}
+                                className="inline-flex items-center gap-1.5 rounded-lg border border-[#E9C578]/30 bg-[#061C14] hover:bg-[#123D2B] px-3 py-1.5 text-xs font-mono font-medium text-[#E9C578] transition-colors cursor-pointer"
+                              >
+                                <Upload className="h-3.5 w-3.5" />
+                                <span>Change</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={handleRemoveScreenshot}
+                                className="inline-flex items-center gap-1.5 rounded-lg border border-[#EF4050]/40 bg-[#3B1219]/70 hover:bg-[#EF4050]/20 px-3 py-1.5 text-xs font-mono font-medium text-[#FFA0A0] transition-colors cursor-pointer"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                                <span>Remove</span>
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {screenshotError && (
+                        <p className="mt-1.5 flex items-center gap-1.5 text-xs text-[#EF4050] font-mono">
+                          <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                          <span>{screenshotError}</span>
                         </p>
                       )}
                     </div>
