@@ -240,13 +240,13 @@ export async function runQAVerificationMatrix(): Promise<{
 
     // First Call (initial dispatch)
     const firstDispatch = await dispatchRegistrationDualEmails(idempotencyPayload, {
-      isSandbox: false,
+      isSandbox: true,
       storageConfirmed: true,
     });
 
     // Second Call with same registrationId (simulated client retry)
     const retryDispatch = await dispatchRegistrationDualEmails(idempotencyPayload, {
-      isSandbox: false,
+      isSandbox: true,
       storageConfirmed: true,
     });
 

@@ -12,9 +12,9 @@ export default defineConfig(() => {
       },
     },
     server: {
-      // HMR fallback configuration to handle cloud dev environment WebSocket proxies cleanly
-      hmr: process.env.DISABLE_HMR === 'true' ? false : { overlay: false },
-      // Disable file watching when DISABLE_HMR is true to save CPU during agent edits.
+      hmr: {
+        overlay: false,
+      },
       watch: process.env.DISABLE_HMR === 'true' ? null : {},
     },
   };

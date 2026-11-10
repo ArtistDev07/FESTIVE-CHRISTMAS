@@ -2,17 +2,19 @@ import { createRoot } from 'react-dom/client';
 import App from './App.tsx';
 import './index.css';
 
-// Global unhandled rejection and console filter to suppress container WebSocket reconnect errors
+// Global unhandled rejection listener to suppress benign Vite client WebSocket errors
 if (typeof window !== 'undefined') {
   window.addEventListener('unhandledrejection', (event) => {
-    const reason = event.reason?.message || String(event.reason || '');
+    const message = event.reason?.message || '';
+    const stack = event.reason?.stack || '';
     if (
-      reason.includes('failed to connect to websocket') ||
-      reason.includes('WebSocket') ||
-      reason.includes('vite:ws')
+      message.includes('WebSocket') ||
+      message.includes('closed without opened') ||
+      message.includes('failed to connect to websocket') ||
+      message.includes('vite:ws') ||
+      stack.includes('@vite/client')
     ) {
       event.preventDefault();
-      event.stopPropagation();
     }
   });
 
