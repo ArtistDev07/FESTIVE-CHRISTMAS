@@ -1,4 +1,5 @@
 import { Resend } from 'resend';
+import nodemailer, { type Transporter } from 'nodemailer';
 import {
   RegistrationPayload,
   EmailDispatchResult,
@@ -8,6 +9,119 @@ import {
   generateParticipantEmail,
   generateOrganizerEmail,
 } from './emailTemplates.ts';
+
+/**
+ * Creates and returns an authentic Gmail SMTP Transporter using Nodemailer.
+ * Requires GMAIL_USER (y.s8269773357@gmail.com) and a 16-character GMAIL_APP_PASSWORD.
+ */
+export function createGmailTransporter(): Transporter | null {
+  const user = (process.env.GMAIL_USER || 'y.s8269773357@gmail.com').trim();
+  const pass = process.env.GMAIL_APP_PASSWORD;
+
+  if (
+    !pass ||
+    pass.trim() === '' ||
+    pass.includes('your_16_digit_app_password') ||
+    pass.startsWith('your_') ||
+    pass.length < 8
+  ) {
+    return null;
+  }
+
+  return nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+      user: user,
+      pass: pass.trim().replace(/\s+/g, ''), // clean spaces from 16-char app password
+    },
+  });
+}
+
+/**
+ * Sends an email via Gmail SMTP using Nodemailer with full logging & attachments
+ */
+export async function sendEmailViaNodemailer(
+  transporter: Transporter,
+  options: {
+    from: string;
+    to: string;
+    subject: string;
+    html: string;
+    text: string;
+    replyTo?: string;
+    attachments?: { filename: string; content: Buffer }[];
+  },
+  type: 'participant' | 'organizer',
+  registrationId: string
+): Promise<EmailDispatchResult> {
+  const timestamp = new Date().toISOString();
+
+  try {
+    const info = await transporter.sendMail({
+      from: options.from,
+      to: options.to,
+      subject: options.subject,
+      html: options.html,
+      text: options.text,
+      replyTo: options.replyTo,
+      attachments: options.attachments,
+    });
+
+    console.log(
+      `[EmailService:GMAIL] ✓ Dispatched ${type.toUpperCase()} email to ${options.to} (MessageId: ${info.messageId})`
+    );
+
+    const result: EmailDispatchResult = {
+      recipient: options.to,
+      type,
+      subject: options.subject,
+      status: 'sent',
+      messageId: info.messageId,
+      attempts: 1,
+      timestamp,
+    };
+
+    emailAuditLogs.push({
+      timestamp,
+      registrationId,
+      type,
+      recipient: options.to,
+      subject: options.subject,
+      status: 'sent',
+      attempts: 1,
+      messageId: info.messageId,
+    });
+    return result;
+  } catch (err: unknown) {
+    const errMsg = err instanceof Error ? err.message : String(err);
+    console.error(
+      `[EmailService:GMAIL Error] ✗ Failed to send ${type} email to ${options.to}:`,
+      errMsg
+    );
+
+    const result: EmailDispatchResult = {
+      recipient: options.to,
+      type,
+      subject: options.subject,
+      status: 'failed',
+      error: errMsg,
+      attempts: 1,
+      timestamp,
+    };
+
+    emailAuditLogs.push({
+      timestamp,
+      registrationId,
+      type,
+      recipient: options.to,
+      subject: options.subject,
+      status: 'failed',
+      attempts: 1,
+      error: errMsg,
+    });
+    return result;
+  }
+}
 
 // In-memory idempotency cache: maps registrationId to DualEmailResponse
 const processedRegistrations = new Map<string, DualEmailResponse>();
@@ -502,38 +616,79 @@ export async function dispatchRegistrationDualEmails(
     }
   }
 
-  // 7. Dispatch Dual Emails Concurrently
-  console.log(`[EmailService] Initiating dual email dispatch for registration: ${regId} (from: "${sanitizedFrom}")`);
+  // 7. Dispatch Dual Emails Concurrently (Gmail SMTP via Nodemailer or Resend / Sandbox Fallback)
+  const gmailTransporter = !isSandbox ? createGmailTransporter() : null;
+  const useGmail = Boolean(gmailTransporter);
+
+  const senderAddress = useGmail
+    ? `Festive Christmas Hackathon <${(process.env.GMAIL_USER || 'y.s8269773357@gmail.com').trim()}>`
+    : sanitizedFrom;
+
+  console.log(
+    `[EmailService] Initiating dual email dispatch for registration: ${regId} via ${
+      useGmail ? 'Gmail SMTP Transporter (Nodemailer)' : 'Resend / Sandbox Provider'
+    } (Sender: "${senderAddress}")`
+  );
+
   const [participantResult, organizerResult] = await Promise.all([
-    sendEmailViaResend(
-      resendClient,
-      {
-        from: sanitizedFrom,
-        to: participantEmail,
-        subject: participantTemplate.subject,
-        html: participantTemplate.html,
-        text: participantTemplate.text,
-        replyTo: sanitizedReplyTo,
-      },
-      'participant',
-      regId,
-      isSandbox
-    ),
-    sendEmailViaResend(
-      resendClient,
-      {
-        from: sanitizedFrom,
-        to: organizerEmail,
-        subject: organizerTemplate.subject,
-        html: organizerTemplate.html,
-        text: organizerTemplate.text,
-        replyTo: sanitizedReplyTo,
-        attachments: adminAttachments,
-      },
-      'organizer',
-      regId,
-      isSandbox
-    ),
+    useGmail && gmailTransporter
+      ? sendEmailViaNodemailer(
+          gmailTransporter,
+          {
+            from: senderAddress,
+            to: participantEmail,
+            subject: participantTemplate.subject,
+            html: participantTemplate.html,
+            text: participantTemplate.text,
+            replyTo: organizerEmail,
+          },
+          'participant',
+          regId
+        )
+      : sendEmailViaResend(
+          resendClient,
+          {
+            from: sanitizedFrom,
+            to: participantEmail,
+            subject: participantTemplate.subject,
+            html: participantTemplate.html,
+            text: participantTemplate.text,
+            replyTo: sanitizedReplyTo,
+          },
+          'participant',
+          regId,
+          isSandbox
+        ),
+    useGmail && gmailTransporter
+      ? sendEmailViaNodemailer(
+          gmailTransporter,
+          {
+            from: senderAddress,
+            to: organizerEmail,
+            subject: organizerTemplate.subject,
+            html: organizerTemplate.html,
+            text: organizerTemplate.text,
+            replyTo: participantEmail,
+            attachments: adminAttachments,
+          },
+          'organizer',
+          regId
+        )
+      : sendEmailViaResend(
+          resendClient,
+          {
+            from: sanitizedFrom,
+            to: organizerEmail,
+            subject: organizerTemplate.subject,
+            html: organizerTemplate.html,
+            text: organizerTemplate.text,
+            replyTo: sanitizedReplyTo,
+            attachments: adminAttachments,
+          },
+          'organizer',
+          regId,
+          isSandbox
+        ),
   ]);
 
   const response: DualEmailResponse = {

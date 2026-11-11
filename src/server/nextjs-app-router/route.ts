@@ -1,3 +1,4 @@
+import nodemailer from 'nodemailer';
 import { Resend } from 'resend';
 import {
   registrationSchema,
@@ -10,33 +11,38 @@ import {
 /**
  * ============================================================================
  * FESTIVE CHRISTMAS HACKATHON 2026 — NEXT.JS APP ROUTER REGISTRATION HANDLER
- * File Target: app/api/register/route.ts (or src/app/api/register/route.ts)
+ * Target: app/api/register/route.ts (or src/app/api/register/route.ts)
  * Built with Web Standard Request & Response.json() (Next.js 13/14/15 compatible)
  * ============================================================================
  * 
- * Features:
- * 1. Form Submission & Google Sheets Sync:
- *    - Saves submitted row automatically into Google Sheets ("Festive Christmas Hackathon — Team Registration").
- * 2. Payment Screenshot & File Handling:
- *    - Handles JSON payload with Base64 screenshot OR multipart/form-data.
- *    - Converts payment screenshot to a clean binary Buffer attachment.
- * 3. Dual Email Notification (User + Admin):
- *    - Email 1 (Participant / Team Leader): Confirmation pass with Registration ID & event instructions.
- *    - Email 2 (Admin: yogeshsharma9425903357@gmail.com): Admin notification with full team roster & attached payment screenshot.
- * 4. Resilient Error Handling & Idempotency:
- *    - Returns { success: true, registrationId: "XMAS-2026-XXXXXX" }.
- *    - Resilient against Google API quota delays or network limits.
+ * Direct Requirements Covered:
+ * 1. Recipient Configuration:
+ *    - Organizer / Admin: y.s8269773357@gmail.com (receives all details + payment screenshot)
+ *    - User / Team Leader: Dynamic leaderEmail / teamLeaderEmail (receives pass)
+ * 2. Gmail SMTP Transporter (Nodemailer):
+ *    - Uses nodemailer with Gmail service, authenticated via GMAIL_USER & GMAIL_APP_PASSWORD
+ *    - Dual email dispatch: Email 1 (Leader pass) + Email 2 (Admin audit with attached screenshot buffer)
+ * 3. Error Logging & Verification:
+ *    - Explicit try/catch around sendMail()
+ *    - Logs info.messageId on success and error.message on failure
+ * 4. Google Sheets Sync:
+ *    - Retries with exponential backoff on 429/503
+ *    - Returns clean JSON { success: true, registrationId: "XMAS-2026-XXXXXX" }
  */
 
-// Initialize Resend
-const resend = new Resend(process.env.RESEND_API_KEY || 're_placeholder_secret_key');
-const ORGANIZER_EMAIL = process.env.ORGANIZER_EMAIL || 'yogeshsharma9425903357@gmail.com';
-const FROM_EMAIL = process.env.FROM_EMAIL || 'Festive Christmas Hackathon <onboarding@resend.dev>';
+// Configuration Constants
+const ORGANIZER_EMAIL = (process.env.ORGANIZER_EMAIL || 'y.s8269773357@gmail.com').trim();
+const GMAIL_USER = (process.env.GMAIL_USER || 'y.s8269773357@gmail.com').trim();
+const GMAIL_APP_PASSWORD = process.env.GMAIL_APP_PASSWORD || '';
+const FROM_EMAIL = process.env.FROM_EMAIL || `Festive Christmas Hackathon <${GMAIL_USER}>`;
 const GOOGLE_SCRIPT_WEB_APP_URL =
   process.env.GOOGLE_SCRIPT_WEB_APP_URL ||
   'https://script.google.com/macros/s/AKfycbx5sIBLF1mvrFmWp9jDueYdWgqUUITGMMZOrbrAIxRes0NymQGdfmicH0lTc7YJRl5njQ/exec';
 const REGISTRATION_AUTH_SECRET =
   process.env.REGISTRATION_AUTH_SECRET || 'xmas_sec_8f9a2b4e7c1d3f5a6b8e0d2c4b6a8e0f';
+
+// Fallback Resend instance if configured
+const resend = new Resend(process.env.RESEND_API_KEY || 're_placeholder_secret_key');
 
 // In-memory idempotency deduplication cache
 const processedRegistrations = new Set<string>();
@@ -89,6 +95,11 @@ export async function POST(req: Request): Promise<Response> {
           console.warn('[Next.js Route] Notice decoding screenshot Base64:', bufErr);
         }
       }
+    }
+
+    // Support teamLeaderEmail alias
+    if (!payload.leaderEmail && payload.teamLeaderEmail) {
+      payload.leaderEmail = payload.teamLeaderEmail;
     }
 
     // 0. IP Rate Limiter (Max 5 submissions per 10 mins)
@@ -170,31 +181,39 @@ export async function POST(req: Request): Promise<Response> {
       });
     }
 
-    // 2. Synchronize to Google Sheets
+    // 3. Synchronize to Google Sheets with Exponential Backoff
     let sheetSaved = false;
     let gasNotice = '';
 
     try {
-      const gasResponse = await fetch(GOOGLE_SCRIPT_WEB_APP_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify({
-          ...payload,
-          registrationId,
-          authSecret: REGISTRATION_AUTH_SECRET,
-        }),
-      });
+      const gasResult = await fetchWithExponentialBackoff(
+        GOOGLE_SCRIPT_WEB_APP_URL,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({
+            ...payload,
+            registrationId,
+            authSecret: REGISTRATION_AUTH_SECRET,
+          }),
+        },
+        3,
+        500
+      );
 
-      const gasText = await gasResponse.text();
-      try {
-        const gasJson = JSON.parse(gasText);
-        if (gasJson.status === 'success' || gasJson.sheetSaved === true) {
-          sheetSaved = true;
-        } else {
-          gasNotice = gasJson.message || 'Apps script reported pending state.';
+      if (gasResult.ok && gasResult.text) {
+        try {
+          const gasJson = JSON.parse(gasResult.text);
+          if (gasJson.status === 'success' || gasJson.sheetSaved === true) {
+            sheetSaved = true;
+          } else {
+            gasNotice = gasJson.message || 'Apps script reported pending state.';
+          }
+        } catch {
+          gasNotice = gasResult.text.slice(0, 120);
         }
-      } catch {
-        gasNotice = gasText.slice(0, 120);
+      } else {
+        gasNotice = gasResult.error || 'Upstream sync notice';
       }
     } catch (gasErr: any) {
       console.warn('[Next.js Route] Google Sheets Webhook notice:', gasErr?.message);
@@ -203,7 +222,7 @@ export async function POST(req: Request): Promise<Response> {
 
     processedRegistrations.add(registrationId);
 
-    // 3. Prepare Email Attachments for Admin
+    // 4. Prepare Email Attachments for Admin
     const adminAttachments: { filename: string; content: Buffer; contentType?: string }[] = [];
     if (screenshotBuffer && screenshotBuffer.length > 0) {
       adminAttachments.push({
@@ -213,7 +232,7 @@ export async function POST(req: Request): Promise<Response> {
       });
     }
 
-    // 4. Dual Email Dispatch (Resend)
+    // 5. HTML Email Templates
     // Email 1: Team Leader Confirmation Pass
     const participantHtml = `
       <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #041710; color: #FFF4DF; padding: 24px;">
@@ -263,35 +282,93 @@ export async function POST(req: Request): Promise<Response> {
       </div>
     `;
 
-    // Dispatch emails concurrently
-    const apiKey = process.env.RESEND_API_KEY;
-    const isMockKey = !apiKey || apiKey.startsWith('re_placeholder') || apiKey.includes('MY_RESEND_API_KEY');
+    // 6. Dual Email Dispatch: Primary = Gmail SMTP via Nodemailer, Fallback = Resend
+    let emailStatus = { participant: 'PENDING', organizer: 'PENDING' };
 
-    if (!isMockKey) {
-      await Promise.allSettled([
-        resend.emails.send({
-          from: FROM_EMAIL,
+    const isGmailConfigured =
+      GMAIL_APP_PASSWORD &&
+      GMAIL_APP_PASSWORD.trim() !== '' &&
+      !GMAIL_APP_PASSWORD.includes('your_16_digit_app_password') &&
+      !GMAIL_APP_PASSWORD.startsWith('your_') &&
+      GMAIL_APP_PASSWORD.length >= 8;
+
+    if (isGmailConfigured) {
+      console.log(`[Next.js Route] Utilizing Gmail SMTP Transporter (${GMAIL_USER}) for dual email dispatch.`);
+      const transporter = nodemailer.createTransport({
+        service: 'gmail',
+        auth: {
+          user: GMAIL_USER,
+          pass: GMAIL_APP_PASSWORD.trim().replace(/\s+/g, ''),
+        },
+      });
+
+      // Email 1: Send to Team Leader
+      try {
+        const info1 = await transporter.sendMail({
+          from: `Festive Christmas Hackathon <${GMAIL_USER}>`,
           to: payload.leaderEmail,
           subject: 'Registration Received Successfully – Festive Christmas 2026',
           html: participantHtml,
-        }),
-        resend.emails.send({
-          from: FROM_EMAIL,
+          replyTo: ORGANIZER_EMAIL,
+        });
+        console.log(`[Next.js Route:GMAIL] ✓ Leader confirmation sent to ${payload.leaderEmail} (MessageId: ${info1.messageId})`);
+        emailStatus.participant = 'SENT';
+      } catch (err: any) {
+        console.error(`[Next.js Route:GMAIL Error] ✗ Leader email dispatch failed:`, err?.message);
+        emailStatus.participant = 'FAILED';
+      }
+
+      // Email 2: Send to Admin with attached screenshot
+      try {
+        const info2 = await transporter.sendMail({
+          from: `Festive Christmas Hackathon <${GMAIL_USER}>`,
           to: ORGANIZER_EMAIL,
           subject: `New Festive Christmas Registration – ${payload.teamName} – ${registrationId}`,
           html: adminHtml,
+          replyTo: payload.leaderEmail,
           attachments: adminAttachments.length > 0 ? adminAttachments : undefined,
-        }),
-      ]);
+        });
+        console.log(`[Next.js Route:GMAIL] ✓ Admin notification sent to ${ORGANIZER_EMAIL} (MessageId: ${info2.messageId})`);
+        emailStatus.organizer = 'SENT';
+      } catch (err: any) {
+        console.error(`[Next.js Route:GMAIL Error] ✗ Admin email dispatch failed:`, err?.message);
+        emailStatus.organizer = 'FAILED';
+      }
     } else {
-      console.log(`[Next.js Route:SIMULATION] Dual emails dispatched for ${registrationId} with screenshot attachment.`);
+      // Fallback: Resend or Sandboxed simulation
+      const apiKey = process.env.RESEND_API_KEY;
+      const isMockKey = !apiKey || apiKey.startsWith('re_placeholder') || apiKey.includes('MY_RESEND_API_KEY');
+
+      if (!isMockKey) {
+        console.log('[Next.js Route] Gmail App Password not detected. Falling back to Resend provider.');
+        await Promise.allSettled([
+          resend.emails.send({
+            from: FROM_EMAIL,
+            to: payload.leaderEmail,
+            subject: 'Registration Received Successfully – Festive Christmas 2026',
+            html: participantHtml,
+          }),
+          resend.emails.send({
+            from: FROM_EMAIL,
+            to: ORGANIZER_EMAIL,
+            subject: `New Festive Christmas Registration – ${payload.teamName} – ${registrationId}`,
+            html: adminHtml,
+            attachments: adminAttachments.length > 0 ? adminAttachments : undefined,
+          }),
+        ]);
+        emailStatus = { participant: 'SENT', organizer: 'SENT' };
+      } else {
+        console.log(`[Next.js Route:SIMULATION] Dual emails dispatched for ${registrationId} with screenshot attachment.`);
+        emailStatus = { participant: 'SIMULATED', organizer: 'SIMULATED' };
+      }
     }
 
-    // Return clean JSON response
+    // 7. Return clean JSON response
     return Response.json({
       success: true,
       registrationId,
       sheetSaved,
+      emailStatus,
       notice: gasNotice || undefined,
       message: 'Registration successfully received and dual confirmation emails dispatched.',
     });
