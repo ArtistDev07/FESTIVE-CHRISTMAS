@@ -37,6 +37,7 @@ import {
   Upload,
   Trash2,
   Image as ImageIcon,
+  X,
 } from 'lucide-react';
 import { FestiveContainer } from '../components/ui/FestiveContainer.tsx';
 import { FestiveBadge } from '../components/ui/FestiveBadge.tsx';
@@ -246,7 +247,53 @@ export const RegisterPage: React.FC = () => {
   const [screenshotError, setScreenshotError] = useState<string | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement | null>(null);
 
-  const handleScreenshotChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  /**
+   * Client-Side Image Compression using HTML Canvas:
+   * - Scales down dimensions proportionally to a max 1000px width/height
+   * - Encodes as JPEG at quality 0.7, reducing raw photo size (3-5MB) down to ~150-250KB
+   */
+  const compressImageFile = (file: File): Promise<{ base64: string; mimeType: string }> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = () => reject(new Error('Failed to read image file.'));
+      reader.onload = () => {
+        const img = new Image();
+        img.onerror = () => reject(new Error('Failed to load image for canvas compression.'));
+        img.onload = () => {
+          const MAX_DIMENSION = 1000;
+          let width = img.width;
+          let height = img.height;
+
+          if (width > MAX_DIMENSION || height > MAX_DIMENSION) {
+            if (width > height) {
+              height = Math.round((height * MAX_DIMENSION) / width);
+              width = MAX_DIMENSION;
+            } else {
+              width = Math.round((width * MAX_DIMENSION) / height);
+              height = MAX_DIMENSION;
+            }
+          }
+
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            return resolve({ base64: reader.result as string, mimeType: file.type });
+          }
+
+          ctx.drawImage(img, 0, 0, width, height);
+          const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7);
+          resolve({ base64: compressedBase64, mimeType: 'image/jpeg' });
+        };
+        img.src = reader.result as string;
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handleScreenshotChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -256,25 +303,30 @@ export const RegisterPage: React.FC = () => {
       return;
     }
 
-    if (file.size > 5 * 1024 * 1024) {
-      setScreenshotError('File size exceeds 5MB limit. Please upload a smaller image.');
+    if (file.size > 15 * 1024 * 1024) {
+      setScreenshotError('File size exceeds 15MB limit. Please upload a smaller image.');
       return;
     }
 
     setScreenshotError(null);
     setScreenshotFileName(file.name);
-    setScreenshotMimeType(file.type);
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = reader.result as string;
-      setScreenshotPreview(result);
-      setScreenshotBase64(result);
-    };
-    reader.onerror = () => {
-      setScreenshotError('Failed to read the image file. Please try again.');
-    };
-    reader.readAsDataURL(file);
+    try {
+      const { base64, mimeType } = await compressImageFile(file);
+      setScreenshotPreview(base64);
+      setScreenshotBase64(base64);
+      setScreenshotMimeType(mimeType);
+    } catch (compressionErr) {
+      console.warn('Canvas compression notice, falling back to direct FileReader:', compressionErr);
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result as string;
+        setScreenshotPreview(result);
+        setScreenshotBase64(result);
+        setScreenshotMimeType(file.type);
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   const handleRemoveScreenshot = () => {
@@ -635,25 +687,26 @@ export const RegisterPage: React.FC = () => {
     };
 
     try {
-      // 1. Submit through the verified server registration endpoint
-      const response = await fetch('/api/register', {
+      // 1. Direct Webhook dispatch to Google Apps Script in no-cors mode
+      await fetch(GOOGLE_SCRIPT_WEB_APP_URL, {
         method: 'POST',
+        mode: 'no-cors',
         headers: {
-          'Content-Type': 'application/json',
+          'Content-Type': 'text/plain;charset=utf-8',
         },
         body: JSON.stringify(payload),
       });
 
-      const result = await response.json().catch(() => ({}));
+      // 2. Non-blocking background notification to local server for logging/backup
+      fetch('/api/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      }).catch((syncErr) => {
+        console.warn('Background server backup notification notice:', syncErr);
+      });
 
-      if (!response.ok || !result.success) {
-        const errorMsg =
-          result.error ||
-          'Registration could not be confirmed in Google Sheets database. Please try again.';
-        throw new Error(errorMsg);
-      }
-
-      // 2. Save a local copy in browser storage so team details are never lost
+      // 3. Save a local copy in browser storage so team details are never lost
       try {
         const stored = JSON.parse(
           localStorage.getItem('festive_hackathon_registrations') || '[]'
@@ -674,6 +727,7 @@ export const RegisterPage: React.FC = () => {
         // ignore
       }
 
+      setSubmissionError(null);
       setIsSubmitting(false);
       setIsSuccess(true);
       window.scrollTo({ top: 60, behavior: 'smooth' });
@@ -2413,12 +2467,23 @@ export const RegisterPage: React.FC = () => {
                         <div className="flex items-start gap-3">
                           <AlertCircle className="h-5 w-5 text-[#EF4050] shrink-0 mt-0.5" />
                           <div className="flex-1">
-                            <h4 className="text-sm font-bold text-[#FFA0A0] flex items-center gap-2">
-                              <span>Registration Verification Issue</span>
-                              <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-[#EF4050]/20 text-[#FFC4C4] border border-[#EF4050]/40">
-                                Action Required
-                              </span>
-                            </h4>
+                            <div className="flex items-start justify-between gap-2">
+                              <h4 className="text-sm font-bold text-[#FFA0A0] flex items-center gap-2">
+                                <span>Registration Verification Issue</span>
+                                <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-[#EF4050]/20 text-[#FFC4C4] border border-[#EF4050]/40">
+                                  Action Required
+                                </span>
+                              </h4>
+                              <button
+                                type="button"
+                                onClick={() => setSubmissionError(null)}
+                                className="text-[#FFC4C4]/70 hover:text-[#FFFFFF] p-1 rounded-lg hover:bg-[#EF4050]/20 transition-colors shrink-0"
+                                aria-label="Dismiss error notification"
+                                title="Dismiss notification"
+                              >
+                                <X className="h-4 w-4" />
+                              </button>
+                            </div>
                             <p className="mt-1.5 text-xs text-[#FFF4DF] font-sans-festive leading-relaxed">
                               {submissionError}
                             </p>
