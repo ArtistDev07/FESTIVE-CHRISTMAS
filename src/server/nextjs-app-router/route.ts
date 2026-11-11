@@ -1,4 +1,11 @@
 import { Resend } from 'resend';
+import {
+  registrationSchema,
+  validateMagicBytes,
+  sanitizeFileName,
+  checkRateLimit,
+  fetchWithExponentialBackoff,
+} from '../security.ts';
 
 /**
  * ============================================================================
@@ -84,32 +91,74 @@ export async function POST(req: Request): Promise<Response> {
       }
     }
 
-    // 1. Mandatory Fields Validation
-    if (!payload.teamName || !payload.leaderEmail || !payload.transactionId) {
+    // 0. IP Rate Limiter (Max 5 submissions per 10 mins)
+    const clientIp =
+      req.headers.get('x-forwarded-for')?.split(',')[0].trim() || 'unknown-ip';
+    const rateCheck = checkRateLimit(clientIp);
+    if (!rateCheck.allowed) {
       return Response.json(
         {
           success: false,
-          error: 'Missing mandatory registration fields (teamName, leaderEmail, transactionId).',
+          error: `Rate limit exceeded: Maximum 5 registrations per 10 minutes. Please retry in ${rateCheck.resetSeconds}s.`,
+        },
+        {
+          status: 429,
+          headers: {
+            'Retry-After': String(rateCheck.resetSeconds),
+            'X-RateLimit-Limit': '5',
+            'X-RateLimit-Remaining': '0',
+          },
+        }
+      );
+    }
+
+    // 1. Zod Schema Validation
+    const parseResult = registrationSchema.safeParse(payload);
+    if (!parseResult.success) {
+      const issues = parseResult.error.issues.map((i) => i.message);
+      return Response.json(
+        {
+          success: false,
+          error: issues[0] || 'Registration input validation failed.',
+          details: issues,
         },
         { status: 400 }
       );
     }
 
-    // Strict 12-Digit Numeric UTR Validation
-    const cleanUtr = String(payload.transactionId).trim();
-    if (!/^\d{12}$/.test(cleanUtr)) {
-      return Response.json(
-        {
-          success: false,
-          error: 'Invalid UTR: Transaction ID must be exactly 12 numeric digits.',
-        },
-        { status: 400 }
-      );
+    payload = parseResult.data;
+
+    // 2. File Upload Security (5MB Limit & Magic Byte Signature Check)
+    if (screenshotBuffer && screenshotBuffer.length > 0) {
+      if (screenshotBuffer.length > 5 * 1024 * 1024) {
+        return Response.json(
+          {
+            success: false,
+            error: `File size exceeds 5MB limit (${(screenshotBuffer.length / (1024 * 1024)).toFixed(2)}MB).`,
+          },
+          { status: 400 }
+        );
+      }
+
+      const magicCheck = validateMagicBytes(screenshotBuffer);
+      if (!magicCheck.valid) {
+        return Response.json(
+          {
+            success: false,
+            error: magicCheck.error || 'Invalid file format: Only genuine PNG, JPEG, or WEBP images are allowed.',
+          },
+          { status: 400 }
+        );
+      }
+
+      screenshotMimeType = magicCheck.detectedMime || screenshotMimeType;
+      screenshotFileName = sanitizeFileName(screenshotFileName, screenshotMimeType);
     }
 
-    // Generate or format registration ID
+    const cleanUtr = payload.transactionId;
     const registrationId =
       payload.registrationId || `XMAS-2026-${Math.floor(100000 + Math.random() * 900000)}`;
+    payload.registrationId = registrationId;
 
     // Idempotency check: prevent duplicate email dispatches
     if (processedRegistrations.has(registrationId)) {

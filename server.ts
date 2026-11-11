@@ -4,6 +4,14 @@ import path from 'path';
 import dotenv from 'dotenv';
 import { dispatchRegistrationDualEmails } from './src/server/emailService.ts';
 import {
+  registrationSchema,
+  validateMagicBytes,
+  sanitizeFileName,
+  checkRateLimit,
+  validateRequestOrigin,
+  fetchWithExponentialBackoff,
+} from './src/server/security.ts';
+import {
   runQAVerificationMatrix,
   runE2EScenarioMatrix,
   runAll20ProductionTests,
@@ -70,21 +78,6 @@ export const GOOGLE_SCRIPT_WEB_APP_URL =
 // Server-side in-memory idempotency register
 const serverRegisteredIds = new Set<string>();
 
-// Security: IP-based Rate Limiter (Max 10 submissions per 60 seconds per IP)
-const ipRequestTimes = new Map<string, number[]>();
-function isRateLimited(ip: string): boolean {
-  const now = Date.now();
-  const windowMs = 60 * 1000;
-  const maxRequests = 10;
-  const timestamps = (ipRequestTimes.get(ip) || []).filter((t) => now - t < windowMs);
-  if (timestamps.length >= maxRequests) {
-    return true;
-  }
-  timestamps.push(now);
-  ipRequestTimes.set(ip, timestamps);
-  return false;
-}
-
 app.post('/api/register', async (req: Request, res: Response) => {
   try {
     // Security 1: Honeypot Anti-Spam Check
@@ -96,49 +89,100 @@ app.post('/api/register', async (req: Request, res: Response) => {
       });
     }
 
-    // Security 2: IP-based Rate Limiter
+    // Security 2: CSRF & Origin Validation
+    const origin = req.headers.origin;
+    const referer = req.headers.referer;
+    const host = req.headers.host;
+    if (!validateRequestOrigin(origin, referer, host)) {
+      console.warn(`[Security Alert] Untrusted Origin/Referer blocked: Origin="${origin}", Referer="${referer}"`);
+      return res.status(403).json({
+        success: false,
+        error: 'Access Denied: Cross-site request rejected.',
+      });
+    }
+
+    // Security 3: IP-based Rate Limiter (Max 5 submissions per IP per 10 minutes)
     const clientIp =
       req.headers['x-forwarded-for']?.toString().split(',')[0].trim() ||
       req.socket.remoteAddress ||
       'unknown-ip';
-    if (isRateLimited(clientIp)) {
-      console.warn(`[Security Alert] Rate limit exceeded for IP: ${clientIp}`);
+    const rateCheck = checkRateLimit(clientIp);
+    res.setHeader('X-RateLimit-Limit', '5');
+    res.setHeader('X-RateLimit-Remaining', String(rateCheck.remaining));
+
+    if (!rateCheck.allowed) {
+      console.warn(`[Security Alert] Rate limit exceeded for IP: ${clientIp} (${rateCheck.resetSeconds}s cooldown)`);
+      res.setHeader('Retry-After', String(rateCheck.resetSeconds));
       return res.status(429).json({
         success: false,
-        error: 'Too many registration requests. Please wait 60 seconds before retrying.',
+        error: `Rate limit exceeded: Maximum 5 registrations per 10 minutes. Please retry in ${rateCheck.resetSeconds} seconds.`,
+        retryAfterSeconds: rateCheck.resetSeconds,
       });
     }
 
-    const payload = req.body as RegistrationPayload & { isSimulation?: boolean };
-
-    // Security 3: Strict Input Validation
-    if (!payload || !payload.leaderEmail || !payload.teamName || !payload.transactionId) {
+    // Security 4: Strict Input Validation via Zod Schema
+    const parseResult = registrationSchema.safeParse(req.body);
+    if (!parseResult.success) {
+      const issues = parseResult.error.issues.map((i) => i.message);
+      console.warn('[Validation Notice] Form validation failed:', issues);
       return res.status(400).json({
         success: false,
-        error: 'Missing mandatory registration fields (leaderEmail, teamName, or transactionId).',
+        error: issues[0] || 'Registration input validation failed.',
+        details: issues,
       });
     }
 
-    const cleanEmail = String(payload.leaderEmail || '').trim().toLowerCase();
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
-      return res.status(400).json({
-        success: false,
-        error: 'Invalid email address format for team leader.',
-      });
+    const payload = parseResult.data as RegistrationPayload & { isSimulation?: boolean };
+
+    // Security 5: File Upload Security (Payment Screenshot Magic Byte & 5MB Check)
+    let cleanScreenshotBase64 = payload.paymentScreenshotBase64 || '';
+    let cleanScreenshotFileName = payload.paymentScreenshotFileName || 'Payment_Screenshot.jpg';
+    let cleanScreenshotMime = payload.paymentScreenshotMimeType || 'image/jpeg';
+
+    if (cleanScreenshotBase64 && cleanScreenshotBase64.trim() !== '') {
+      try {
+        let rawBase64 = cleanScreenshotBase64.trim();
+        if (rawBase64.includes(',')) {
+          rawBase64 = rawBase64.split(',')[1];
+        }
+        const buffer = Buffer.from(rawBase64, 'base64');
+
+        // File Security Gate 1: Enforce strict 5MB limit
+        if (buffer.length > 5 * 1024 * 1024) {
+          return res.status(400).json({
+            success: false,
+            error: `File size exceeds 5MB limit (${(buffer.length / (1024 * 1024)).toFixed(2)}MB). Please upload a smaller receipt.`,
+          });
+        }
+
+        // File Security Gate 2: Enforce Magic Byte signatures (PNG, JPEG, WebP)
+        const magicResult = validateMagicBytes(buffer);
+        if (!magicResult.valid) {
+          console.warn(`[Security Alert] Invalid magic bytes in uploaded screenshot from IP: ${clientIp}`);
+          return res.status(400).json({
+            success: false,
+            error: magicResult.error || 'Invalid file format: Only genuine PNG, JPEG, or WEBP images are allowed.',
+          });
+        }
+
+        cleanScreenshotMime = magicResult.detectedMime || cleanScreenshotMime;
+        cleanScreenshotFileName = sanitizeFileName(cleanScreenshotFileName, cleanScreenshotMime);
+      } catch (fileErr) {
+        return res.status(400).json({
+          success: false,
+          error: 'Corrupt payment screenshot data: Base64 decode failed.',
+        });
+      }
     }
 
-    // Security 4: Strict 12-Digit Numeric UTR Validation
-    const cleanUtr = String(payload.transactionId || '').trim();
-    if (!/^\d{12}$/.test(cleanUtr)) {
-      return res.status(400).json({
-        success: false,
-        error: 'Invalid UTR: Transaction ID must be exactly 12 numeric digits.',
-      });
-    }
+    payload.paymentScreenshotBase64 = cleanScreenshotBase64;
+    payload.paymentScreenshotFileName = cleanScreenshotFileName;
+    payload.paymentScreenshotMimeType = cleanScreenshotMime;
 
     const regId = payload.registrationId || `XMAS-2026-${Math.floor(100000 + Math.random() * 900000)}`;
+    payload.registrationId = regId;
 
-    // Security 5: Server-side Idempotency (Block duplicate clicks or repeated retries)
+    // Security 6: Server-side Idempotency (Block duplicate clicks or repeated retries)
     if (serverRegisteredIds.has(regId)) {
       console.log(`[Registration API] Duplicate registration caught: ${regId}`);
       return res.status(200).json({
@@ -150,7 +194,7 @@ app.post('/api/register', async (req: Request, res: Response) => {
       });
     }
 
-    // 6. Simulation Mode (testing without altering live production sheet)
+    // 7. Simulation Mode (testing without altering live production sheet)
     if (payload.isSimulation) {
       serverRegisteredIds.add(regId);
       const emailResult = await dispatchRegistrationDualEmails(payload, {
@@ -168,7 +212,7 @@ app.post('/api/register', async (req: Request, res: Response) => {
       });
     }
 
-    // Security 6: Forward with Server-to-Server Authentication Secret
+    // 8. Forward to Google Apps Script with Exponential Backoff
     console.log(`[Registration API] Transmitting registration ${regId} to Google Apps Script...`);
     const authSecret =
       process.env.REGISTRATION_AUTH_SECRET || 'xmas_sec_8f9a2b4e7c1d3f5a6b8e0d2c4b6a8e0f';
@@ -177,11 +221,9 @@ app.post('/api/register', async (req: Request, res: Response) => {
     let gasResponseData: any = null;
     let gasError: string | null = null;
 
-    const controller = new AbortController();
-    const timeoutHandle = setTimeout(() => controller.abort(), 30000);
-
-    try {
-      const gasFetch = await fetch(GOOGLE_SCRIPT_WEB_APP_URL, {
+    const gasResult = await fetchWithExponentialBackoff(
+      GOOGLE_SCRIPT_WEB_APP_URL,
+      {
         method: 'POST',
         headers: {
           'Content-Type': 'text/plain;charset=utf-8',
@@ -192,39 +234,33 @@ app.post('/api/register', async (req: Request, res: Response) => {
           authSecret: authSecret,
         }),
         redirect: 'follow',
-        signal: controller.signal,
-      });
+      },
+      3,
+      500
+    );
 
-      clearTimeout(timeoutHandle);
-      const responseText = await gasFetch.text();
-
-      // Check for Google Login redirect or Google Drive permission error
-      const lowerResponse = responseText.toLowerCase();
-      if (lowerResponse.includes('accounts.google.com') || lowerResponse.includes('servicelogin')) {
+    if (gasResult.ok && gasResult.text) {
+      const lower = gasResult.text.toLowerCase();
+      if (lower.includes('accounts.google.com') || lower.includes('servicelogin')) {
         gasError =
-          'Google Apps Script Web App access is restricted: Web App deployment "Who has access" must be set to "Anyone" (currently requires Google Login).';
-      } else if (lowerResponse.includes('unable to open the file')) {
+          'Google Apps Script Web App access is restricted: Web App deployment "Who has access" must be set to "Anyone".';
+      } else if (lower.includes('unable to open the file')) {
         gasError =
-          'Google Apps Script cannot access the file: Ensure Web App is published with Execute as "Me" and Who has access "Anyone".';
+          'Google Apps Script cannot access the file: Ensure Web App is published with Execute as "Me".';
       } else {
         try {
-          gasResponseData = JSON.parse(responseText);
+          gasResponseData = JSON.parse(gasResult.text);
           if (gasResponseData.status === 'success' || gasResponseData.sheetSaved === true) {
             sheetSaved = true;
           } else if (gasResponseData.status === 'error') {
-            gasError = gasResponseData.message || 'Google Apps Script reported an error saving row.';
+            gasError = gasResponseData.message || 'Apps script reported pending state.';
           }
         } catch {
-          gasError = `Google Apps Script returned unparseable text: ${responseText.slice(0, 160)}`;
+          gasError = gasResult.text.slice(0, 120);
         }
       }
-    } catch (networkErr: unknown) {
-      clearTimeout(timeoutHandle);
-      if (networkErr instanceof Error && networkErr.name === 'AbortError') {
-        gasError = 'Connection to Google Apps Script timed out after 30 seconds.';
-      } else {
-        gasError = `Connection to Google Apps Script failed: ${networkErr instanceof Error ? networkErr.message : String(networkErr)}`;
-      }
+    } else {
+      gasError = gasResult.error || 'Google Apps Script temporary sync notice.';
     }
 
     // 7. Record in idempotency cache

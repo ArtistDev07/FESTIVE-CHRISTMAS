@@ -303,8 +303,8 @@ export const RegisterPage: React.FC = () => {
       return;
     }
 
-    if (file.size > 15 * 1024 * 1024) {
-      setScreenshotError('File size exceeds 15MB limit. Please upload a smaller image.');
+    if (file.size > 5 * 1024 * 1024) {
+      setScreenshotError('File size exceeds 5MB limit. Please upload a smaller image.');
       return;
     }
 
