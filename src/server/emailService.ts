@@ -138,6 +138,7 @@ async function sendEmailViaResend(
     html: string;
     text: string;
     replyTo?: string;
+    attachments?: { filename: string; content: Buffer }[];
   },
   type: 'participant' | 'organizer',
   registrationId: string,
@@ -157,7 +158,11 @@ async function sendEmailViaResend(
   if (isSimulated || !resend) {
     const sandboxId = `sandbox_msg_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
     console.log(
-      `[EmailService:SANDBOX] Dispatched ${type.toUpperCase()} email to ${options.to} (Subject: "${options.subject}") [ID: ${sandboxId}]`
+      `[EmailService:SANDBOX] Dispatched ${type.toUpperCase()} email to ${options.to} (Subject: "${options.subject}") [ID: ${sandboxId}]${
+        options.attachments && options.attachments.length > 0
+          ? ` [Attached: ${options.attachments.map((a) => a.filename).join(', ')}]`
+          : ''
+      }`
     );
 
     const result: EmailDispatchResult = {
@@ -245,6 +250,7 @@ async function sendEmailViaResend(
         html: string;
         text: string;
         reply_to?: string;
+        attachments?: { filename: string; content: Buffer }[];
       } = {
         from: currentFrom,
         to: [targetTo],
@@ -255,6 +261,10 @@ async function sendEmailViaResend(
 
       if (currentReplyTo) {
         sendPayload.reply_to = currentReplyTo;
+      }
+
+      if (options.attachments && options.attachments.length > 0) {
+        sendPayload.attachments = options.attachments;
       }
 
       const { data, error } = await resend.emails.send(sendPayload);
@@ -468,6 +478,30 @@ export async function dispatchRegistrationDualEmails(
   const participantTemplate = generateParticipantEmail(payload);
   const organizerTemplate = generateOrganizerEmail(payload);
 
+  // 6b. Process Payment Screenshot as Email Attachment for Organizer Verification
+  let adminAttachments: { filename: string; content: Buffer }[] | undefined = undefined;
+  if (payload.paymentScreenshotBase64 && payload.paymentScreenshotBase64.trim() !== '') {
+    try {
+      let rawBase64 = payload.paymentScreenshotBase64.trim();
+      if (rawBase64.includes(',')) {
+        rawBase64 = rawBase64.split(',')[1];
+      }
+      const buffer = Buffer.from(rawBase64, 'base64');
+      const filename = payload.paymentScreenshotFileName || 'Payment_Receipt_Screenshot.jpg';
+      adminAttachments = [
+        {
+          filename,
+          content: buffer,
+        },
+      ];
+      console.log(
+        `[EmailService] Prepared payment screenshot attachment "${filename}" (${buffer.length} bytes) for organizer.`
+      );
+    } catch (attErr) {
+      console.warn('[EmailService] Failed to parse screenshot base64 into attachment buffer:', attErr);
+    }
+  }
+
   // 7. Dispatch Dual Emails Concurrently
   console.log(`[EmailService] Initiating dual email dispatch for registration: ${regId} (from: "${sanitizedFrom}")`);
   const [participantResult, organizerResult] = await Promise.all([
@@ -494,6 +528,7 @@ export async function dispatchRegistrationDualEmails(
         html: organizerTemplate.html,
         text: organizerTemplate.text,
         replyTo: sanitizedReplyTo,
+        attachments: adminAttachments,
       },
       'organizer',
       regId,

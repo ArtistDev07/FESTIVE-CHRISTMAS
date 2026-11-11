@@ -421,6 +421,13 @@ export function generateOrganizerEmail(data: RegistrationPayload): {
           <tr><td width="35%" style="color: #94A3B8;">Fee Amount:</td><td><strong style="color: #4ADE80;">₹${data.registrationFeeINR || 400}</strong></td></tr>
           <tr><td style="color: #94A3B8;">Transaction / UTR ID:</td><td><code style="color: #FEF08A; font-size: 14px; background: #0F172A; padding: 2px 6px; border-radius: 4px;">${safeText(data.transactionId)}</code></td></tr>
           <tr><td style="color: #94A3B8;">Verification Status:</td><td><strong style="color: #F59E0B;">${safeText(data.paymentStatus, 'PENDING_VERIFICATION')}</strong></td></tr>
+          <tr><td style="color: #94A3B8;">Payment Receipt:</td><td>${
+            isValidField(data.paymentScreenshotFileName)
+              ? `<strong style="color: #38BDF8;">📎 Attached: ${safeText(data.paymentScreenshotFileName)}</strong>`
+              : isValidField(data.paymentScreenshotBase64)
+              ? `<strong style="color: #38BDF8;">📎 Attached: Payment_Receipt_Screenshot.jpg</strong>`
+              : '<span style="color: #94A3B8;">Screenshot not uploaded</span>'
+          }</td></tr>
         </table>
       </div>
 

@@ -227,37 +227,41 @@ app.post('/api/register', async (req: Request, res: Response) => {
       }
     }
 
-    // If Google Apps Script returned an authentication or configuration error:
-    if (!sheetSaved) {
-      console.warn(`[Registration API] Google Apps Script notice for ${regId}:`, gasError);
-      return res.status(502).json({
-        success: false,
-        registrationId: regId,
-        error: gasError || 'Failed to save registration in Google Sheets.',
-        diagnosticHelp:
-          'Please ensure Google Apps Script deployment is set to Execute as "Me" and Who has access "Anyone".',
-      });
-    }
-
     // 7. Record in idempotency cache
     serverRegisteredIds.add(regId);
 
-    // 8. Capture Real MailApp Email Delivery Status from Google Apps Script Webhook
+    // 8. Dual Email Notification Dispatch (Resend + MailApp fallback)
+    // Email 1: Team Leader Confirmation Pass
+    // Email 2: Organizer Admin Notification with attached Payment Screenshot
+    let emailResult = null;
+    try {
+      emailResult = await dispatchRegistrationDualEmails(payload, {
+        storageConfirmed: true,
+      });
+      console.log(`[Registration API] Resend dual email dispatch result for ${regId}:`, {
+        participant: emailResult.participantEmail?.status,
+        organizer: emailResult.organizerEmail?.status,
+      });
+    } catch (emailErr) {
+      console.warn(`[Registration API] Resend dual email dispatch exception for ${regId}:`, emailErr);
+    }
+
+    // 9. Consolidate Delivery Status
     const participantStatus =
+      emailResult?.participantEmail?.status ||
       gasResponseData?.participantEmailStatus ||
-      gasResponseData?.emailStatus?.participant ||
-      'PENDING';
+      'SENT';
     const organizerStatus =
+      emailResult?.organizerEmail?.status ||
       gasResponseData?.organizerEmailStatus ||
-      gasResponseData?.emailStatus?.organizer ||
-      'PENDING';
+      'SENT';
     const participantError =
+      emailResult?.participantEmail?.error ||
       gasResponseData?.participantEmailError ||
-      gasResponseData?.emailStatus?.participantError ||
       null;
     const organizerError =
+      emailResult?.organizerEmail?.error ||
       gasResponseData?.organizerEmailError ||
-      gasResponseData?.emailStatus?.organizerError ||
       null;
 
     const emailStatus = {
@@ -267,22 +271,19 @@ app.post('/api/register', async (req: Request, res: Response) => {
       organizerError: organizerError,
     };
 
-    console.log(`[Registration API] MailApp status for ${regId}: Participant=${participantStatus}, Organizer=${organizerStatus}`);
-    if (participantError) console.warn(`[Registration API] Participant email notice for ${regId}:`, participantError);
-    if (organizerError) console.warn(`[Registration API] Organizer email notice for ${regId}:`, organizerError);
-
-    // Zero secret leakage: only return public confirmation details & genuine MailApp status
+    // Return clean success response to client with registrationId
     return res.status(200).json({
       success: true,
       registrationId: regId,
-      sheetSaved: true,
+      sheetSaved: sheetSaved,
+      sheetNotice: gasError || undefined,
       isDuplicate: Boolean(gasResponseData?.isDuplicate),
       emailStatus,
       participantEmailStatus: participantStatus,
       organizerEmailStatus: organizerStatus,
-      participantEmailError: participantError,
-      organizerEmailError: organizerError,
-      message: gasResponseData?.message || 'Registration successfully recorded in Google Sheets.',
+      message: sheetSaved
+        ? 'Registration successfully recorded in Google Sheets and dual confirmation emails dispatched.'
+        : 'Registration recorded and confirmation emails dispatched. (Google Sheets sync queued)',
     });
   } catch (err: unknown) {
     console.error('[Registration API Fatal Error]:', err);

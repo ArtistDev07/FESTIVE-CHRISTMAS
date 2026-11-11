@@ -282,7 +282,8 @@ function resolveSpreadsheet() {
   }
 
   // Match tab by name, or use active/first tab
-  var sheet = ss.getSheetByName(SPREADSHEET_NAME) ||
+  var sheet = ss.getSheetByName("Festive Christmas Hackathon — Team Registration") ||
+              ss.getSheetByName(SPREADSHEET_NAME) ||
               ss.getSheetByName("Registrations") ||
               ss.getSheetByName("Sheet1") ||
               ss.getActiveSheet() ||
@@ -779,14 +780,34 @@ function sendAdminNotificationEmail(data, regId, sheetUrl) {
     + "  </div>"
     + "</div>";
 
-  // Native Google Apps Script MailApp invocation
-  MailApp.sendEmail({
+  // Native Google Apps Script MailApp invocation with Payment Screenshot Attachment
+  var mailOptions = {
     to: recipient,
     subject: subject,
     body: plainTextBody,
     htmlBody: htmlBody,
     name: "Festive Christmas Hackathon 2026"
-  });
+  };
+
+  // Attach Payment Screenshot file if Base64 data was supplied
+  if (data.paymentScreenshotBase64 && String(data.paymentScreenshotBase64).trim() !== "") {
+    try {
+      var rawBase64 = String(data.paymentScreenshotBase64).trim();
+      if (rawBase64.indexOf(",") !== -1) {
+        rawBase64 = rawBase64.split(",")[1];
+      }
+      var mimeType = data.paymentScreenshotMimeType || "image/jpeg";
+      var fileName = data.paymentScreenshotFileName || "Payment_Receipt_Screenshot.jpg";
+      var decodedBytes = Utilities.base64Decode(rawBase64);
+      var screenshotBlob = Utilities.newBlob(decodedBytes, mimeType, fileName);
+      mailOptions.attachments = [screenshotBlob];
+      Logger.log("[Email Service] Successfully attached payment screenshot (" + fileName + ") to admin email.");
+    } catch (attErr) {
+      Logger.log("[Email Warning] Failed to attach payment screenshot to admin email: " + attErr);
+    }
+  }
+
+  MailApp.sendEmail(mailOptions);
 
   return {
     status: "SENT",
